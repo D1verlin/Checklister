@@ -43,7 +43,36 @@ function isVersionNewer(current: string, latest: string): boolean {
 }
 
 /**
- * Queries GitHub API for the latest release.
+ * Fallback to check version directly from raw package.json on GitHub
+ * when GitHub REST API rate limits (HTTP 403) or is blocked.
+ * Has no rate limits and works reliably from any IP.
+ */
+async function checkFallbackVersion(): Promise<UpdateInfo | null> {
+  try {
+    const rawUrl = `https://raw.githubusercontent.com/${GITHUB_REPO}/main/package.json`;
+    const res = await fetch(rawUrl, {
+      signal: AbortSignal.timeout(8000),
+    });
+    if (res.ok) {
+      const data = await res.json();
+      const latestVer = (data.version || '').replace(/^v/i, '') || CURRENT_APP_VERSION;
+      const isAvailable = isVersionNewer(CURRENT_APP_VERSION, latestVer);
+      return {
+        isAvailable,
+        currentVersion: CURRENT_APP_VERSION,
+        latestVersion: latestVer,
+        releaseName: `v${latestVer}`,
+        htmlUrl: `${GITHUB_REPO_URL}/releases/latest`,
+        downloadUrl: `${GITHUB_REPO_URL}/releases/download/v${latestVer}/CheckLister-Setup-${latestVer}.exe`,
+      };
+    }
+  } catch {}
+  return null;
+}
+
+/**
+ * Queries GitHub API for the latest release, with automatic fallback
+ * to raw repository metadata if GitHub REST API rate limits (403).
  */
 export async function checkForAppUpdates(): Promise<UpdateInfo> {
   const apiUrl = `https://api.github.com/repos/${GITHUB_REPO}/releases/latest`;
@@ -54,7 +83,7 @@ export async function checkForAppUpdates(): Promise<UpdateInfo> {
         Accept: 'application/vnd.github.v3+json',
         'User-Agent': 'CheckLister-App',
       },
-      signal: AbortSignal.timeout(10000),
+      signal: AbortSignal.timeout(8000),
     });
 
     if (res.status === 404) {
@@ -68,12 +97,16 @@ export async function checkForAppUpdates(): Promise<UpdateInfo> {
     }
 
     if (!res.ok) {
+      // If GitHub REST API is rate-limited (403) or returns an error, use un-rate-limited fallback
+      const fallback = await checkFallbackVersion();
+      if (fallback) return fallback;
+
       return {
         isAvailable: false,
         currentVersion: CURRENT_APP_VERSION,
         latestVersion: CURRENT_APP_VERSION,
         htmlUrl: GITHUB_REPO_URL,
-        error: `GitHub API error (${res.status})`,
+        error: res.status === 403 ? 'Лимит запросов GitHub API (403)' : `GitHub API error (${res.status})`,
       };
     }
 
@@ -104,6 +137,10 @@ export async function checkForAppUpdates(): Promise<UpdateInfo> {
       downloadUrl,
     };
   } catch (err) {
+    // If network/timeout fails, try fallback
+    const fallback = await checkFallbackVersion();
+    if (fallback) return fallback;
+
     return {
       isAvailable: false,
       currentVersion: CURRENT_APP_VERSION,
