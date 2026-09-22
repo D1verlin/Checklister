@@ -195,16 +195,29 @@ export async function scanLibraryFolders(
 
     animeMap.set(animeMeta.id, animeMeta);
 
+    // Natural sort files by filename so fileIndex is consistent with episode sequence
+    const sortedFiles = [...group.files].sort((a, b) =>
+      a.name.localeCompare(b.name, undefined, { numeric: true, sensitivity: 'base' })
+    );
+
+    const groupEpisodes: Episode[] = [];
+
     // Process episodes for this group
-    for (const file of group.files) {
+    for (let fileIdx = 0; fileIdx < sortedFiles.length; fileIdx++) {
+      const file = sortedFiles[fileIdx];
       const parsed = parseAnimeFileName(file.name, group.parentDir);
       const prevEp = existingEpisodesMap.get(file.path);
+
+      let epNum = parsed.episode;
+      if (epNum === undefined) {
+        epNum = (prevEp?.episodeNumber && prevEp.episodeNumber > 0) ? prevEp.episodeNumber : (fileIdx + 1);
+      }
 
       const ep: Episode = {
         id: prevEp?.id || `ep-${Date.now()}-${Math.random().toString(36).substring(2, 7)}`,
         animeId: animeMeta.id,
-        episodeNumber: parsed.episode ?? 1,
-        seasonNumber: parsed.season ?? 1,
+        episodeNumber: epNum,
+        seasonNumber: parsed.season ?? (prevEp?.seasonNumber || 1),
         fileName: file.name,
         filePath: file.path,
         fileSize: file.size,
@@ -213,7 +226,18 @@ export async function scanLibraryFolders(
         fileMissing: false,
       };
 
-      episodeMap.set(file.path, ep);
+      groupEpisodes.push(ep);
+    }
+
+    // Safety fallback: if an anime has multiple files and all ended up with episodeNumber === 1
+    if (groupEpisodes.length > 1 && groupEpisodes.every(e => e.episodeNumber === 1)) {
+      groupEpisodes.forEach((ep, idx) => {
+        ep.episodeNumber = idx + 1;
+      });
+    }
+
+    for (const ep of groupEpisodes) {
+      episodeMap.set(ep.filePath, ep);
     }
   }
 
@@ -230,6 +254,16 @@ export async function scanLibraryFolders(
 
   saveLibrary(animeList, episodesList);
   return buildAnimeWithEpisodes(animeList, episodesList);
+}
+
+/**
+ * Human-readable byte size formatter.
+ */
+export function formatBytes(bytes?: number): string {
+  if (!bytes || bytes <= 0) return '0 B';
+  const units = ['B', 'KB', 'MB', 'GB', 'TB'];
+  const i = Math.floor(Math.log(bytes) / Math.log(1024));
+  return `${(bytes / Math.pow(1024, i)).toFixed(i >= 2 ? 1 : 0)} ${units[i]}`;
 }
 
 /**
@@ -253,11 +287,28 @@ export function buildAnimeWithEpisodes(anime: AnimeMetadata[], episodes: Episode
     const nextEpisodeToWatch = itemEpisodes.find(ep => !ep.isWatched);
     const hasMissingFiles = itemEpisodes.some(ep => ep.fileMissing);
 
+    // Compute total disk size
+    const totalSizeBytes = itemEpisodes.reduce((acc, ep) => acc + (ep.fileSize || 0), 0);
+
+    // Gap detection: detect missing episode numbers between 1 and max episode found
+    const epNums = new Set(itemEpisodes.map(ep => ep.episodeNumber));
+    const maxEp = itemEpisodes.length > 0 ? Math.max(...itemEpisodes.map(ep => ep.episodeNumber)) : 0;
+    const missingEpisodeNumbers: number[] = [];
+    if (maxEp > 1) {
+      for (let i = 1; i < maxEp; i++) {
+        if (!epNums.has(i)) {
+          missingEpisodeNumbers.push(i);
+        }
+      }
+    }
+
     return {
       ...item,
       episodes: itemEpisodes,
       watchedCount,
       totalLocalEpisodes,
+      totalSizeBytes,
+      missingEpisodeNumbers,
       lastWatchedEpisode,
       nextEpisodeToWatch,
       progressPercent,

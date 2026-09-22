@@ -1,7 +1,8 @@
 import React, { useState, useEffect } from 'react';
-import { Play, Check, Folder, AlertTriangle, Film } from 'lucide-react';
+import { AlertTriangle, Film } from 'lucide-react';
 import type { AnimeWithEpisodes, UILanguage } from '../types/index.ts';
 import { useI18n } from '../i18n/translations.ts';
+import { formatBytes } from '../services/scanner.ts';
 
 interface AnimeCardProps {
   anime: AnimeWithEpisodes;
@@ -10,6 +11,7 @@ interface AnimeCardProps {
   onSelect: (anime: AnimeWithEpisodes) => void;
   onContinueWatching: (anime: AnimeWithEpisodes, e: React.MouseEvent) => void;
   onOpenFolder: (folderPath: string, e: React.MouseEvent) => void;
+  onOpenFolderModal?: (anime: AnimeWithEpisodes, e: React.MouseEvent) => void;
 }
 
 const pendingCoverDownloads = new Set<string>();
@@ -21,6 +23,7 @@ export const AnimeCard: React.FC<AnimeCardProps> = ({
   onSelect,
   onContinueWatching,
   onOpenFolder,
+  onOpenFolderModal,
 }) => {
   const { t } = useI18n(uiLanguage);
   const initialSrc = anime.localCover || anime.coverImage || anime.shikimoriCoverImage;
@@ -35,7 +38,6 @@ export const AnimeCard: React.FC<AnimeCardProps> = ({
     const src = anime.localCover || anime.coverImage || anime.shikimoriCoverImage;
     setCurrentImgSrc(src);
     setImageError(false);
-    // If local file, load instantly without skeleton delay
     setImageLoading(src ? !src.startsWith('checklister-media://') : false);
 
     // If localCover is missing, cache it in background safely
@@ -98,15 +100,14 @@ export const AnimeCard: React.FC<AnimeCardProps> = ({
   if (anime.isCompleted) {
     statusText = t('statusCompleted');
     statusClass = 'bg-black/60 text-[#888888]';
-  } else if (anime.airingStatus === 'RELEASING') {
-    statusText = t('statusAiring');
-    statusClass = 'bg-white/20 text-white font-medium';
   }
+
+  const hasMissingGaps = anime.missingEpisodeNumbers && anime.missingEpisodeNumbers.length > 0;
 
   return (
     <div
       onClick={() => onSelect(anime)}
-      className="group relative flex flex-col rounded-[12px] bg-[#161616]/80 hover:bg-[#1a1a1a] transition-all duration-200 cursor-pointer overflow-hidden border border-white/5 hover:border-white/20 select-none shadow-sm hover:shadow-lg"
+      className="group relative flex flex-col rounded-[12px] bg-[#161616]/80 hover:bg-[#1a1a1a] transition-all duration-200 cursor-pointer overflow-hidden border border-white/5 hover:border-white/15 select-none hover:-translate-y-0.5 hover:shadow-md"
     >
       {/* 2:3 Vertical Poster Container */}
       <div className="relative aspect-[2/3] w-full bg-[#141414] overflow-hidden">
@@ -139,17 +140,29 @@ export const AnimeCard: React.FC<AnimeCardProps> = ({
         )}
 
         {/* Top Overlay Badges */}
-        <div className="absolute top-2.5 inset-x-2.5 flex items-center justify-between pointer-events-none">
+        <div className="absolute top-2.5 inset-x-2.5 flex items-center justify-between pointer-events-none gap-1">
           <div className={`px-2 py-0.5 rounded-[5px] text-[10px] font-mono tracking-wide backdrop-blur-md ${statusClass}`}>
             {statusText}
           </div>
 
-          {anime.hasMissingFiles && (
-            <div className="px-2 py-0.5 rounded-[5px] text-[10px] font-mono text-white bg-black/60 backdrop-blur-md flex items-center gap-1">
-              <AlertTriangle size={11} />
-              <span>{t('statusMissing')}</span>
-            </div>
-          )}
+          <div className="flex items-center gap-1">
+            {hasMissingGaps && (
+              <div
+                className="px-2 py-0.5 rounded-[5px] text-[10px] font-mono text-amber-300 bg-black/75 backdrop-blur-md flex items-center gap-1 border border-amber-500/20"
+                title={`${t('missingEpisodesBanner')} ${anime.missingEpisodeNumbers?.join(', ')}`}
+              >
+                <AlertTriangle size={11} className="text-amber-400" />
+                <span>{anime.missingEpisodeNumbers?.length} проп.</span>
+              </div>
+            )}
+
+            {anime.hasMissingFiles && (
+              <div className="px-2 py-0.5 rounded-[5px] text-[10px] font-mono text-red-400 bg-black/75 backdrop-blur-md flex items-center gap-1 border border-red-500/20">
+                <AlertTriangle size={11} />
+                <span>{t('statusMissing')}</span>
+              </div>
+            )}
+          </div>
         </div>
 
         {/* Bottom Episode Pill */}
@@ -159,32 +172,6 @@ export const AnimeCard: React.FC<AnimeCardProps> = ({
           </div>
         </div>
 
-        {/* Hover Quick Actions */}
-        <div className="absolute inset-0 bg-black/60 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center gap-2 p-4">
-          {nextEp ? (
-            <button
-              onClick={(e) => onContinueWatching(anime, e)}
-              className="btn-primary py-1.5 px-3 text-xs"
-              title={`Play next: Episode ${nextEp.episodeNumber}`}
-            >
-              <Play size={12} fill="currentColor" />
-              <span>EP {String(nextEp.episodeNumber).padStart(2, '0')}</span>
-            </button>
-          ) : (
-            <div className="px-3 py-1.5 rounded-[6px] bg-white/10 text-xs text-white flex items-center gap-1.5 font-mono backdrop-blur-md">
-              <Check size={13} />
-              <span>{t('statusCompleted')}</span>
-            </div>
-          )}
-
-          <button
-            onClick={(e) => onOpenFolder(anime.folderPath, e)}
-            className="btn-icon bg-black/50 text-[#E0E0E0] hover:text-white"
-            title={t('btnShowFolder')}
-          >
-            <Folder size={14} />
-          </button>
-        </div>
       </div>
 
       {/* Flat Progress Bar */}
@@ -196,7 +183,7 @@ export const AnimeCard: React.FC<AnimeCardProps> = ({
       </div>
 
       {/* Card Info Footer */}
-      <div className="p-3.5 flex flex-col justify-between flex-1 gap-1">
+      <div className="p-3.5 flex flex-col justify-between flex-1 gap-1.5">
         <div>
           <h3
             className="text-xs font-semibold text-[#E0E0E0] line-clamp-1 group-hover:text-white transition-colors"
@@ -211,8 +198,31 @@ export const AnimeCard: React.FC<AnimeCardProps> = ({
           )}
         </div>
 
-        <div className="mt-2 pt-2 border-t border-white/5 flex items-center justify-between text-[11px] text-[#888888] font-mono">
-          <span>{anime.totalLocalEpisodes} {t('totalFiles')}</span>
+        {/* Assigned User Folders Tags */}
+        {anime.userFolders && anime.userFolders.length > 0 && (
+          <div className="flex items-center gap-1 overflow-hidden pt-0.5">
+            {anime.userFolders.slice(0, 2).map((f) => (
+              <span
+                key={f}
+                className="px-1.5 py-0.5 text-[9px] font-medium rounded-[4px] bg-white/5 text-[#A0A0A0] border border-white/10 truncate max-w-[80px]"
+              >
+                {f}
+              </span>
+            ))}
+            {anime.userFolders.length > 2 && (
+              <span className="text-[9px] text-[#666666] font-mono">
+                +{anime.userFolders.length - 2}
+              </span>
+            )}
+          </div>
+        )}
+
+        {/* Total Files & Size on Disk */}
+        <div className="mt-1 pt-2 border-t border-white/5 flex items-center justify-between text-[11px] text-[#888888] font-mono">
+          <span>
+            {anime.totalLocalEpisodes} {t('totalFiles')}
+            {anime.totalSizeBytes ? ` • ${formatBytes(anime.totalSizeBytes)}` : ''}
+          </span>
           <span>{anime.progressPercent}%</span>
         </div>
       </div>

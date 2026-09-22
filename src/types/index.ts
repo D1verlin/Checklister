@@ -34,6 +34,7 @@ export interface AnimeMetadata {
   score?: number; // 0-10 or 0-100
   genres?: string[];
   studios?: string[];
+  userFolders?: string[]; // User collections/folders assigned to this anime
   folderPath: string;
   createdAt: string;
   updatedAt: string;
@@ -43,6 +44,8 @@ export interface AnimeWithEpisodes extends AnimeMetadata {
   episodes: Episode[];
   watchedCount: number;
   totalLocalEpisodes: number;
+  totalSizeBytes?: number;
+  missingEpisodeNumbers?: number[];
   lastWatchedEpisode?: number;
   nextEpisodeToWatch?: Episode;
   progressPercent: number;
@@ -52,19 +55,24 @@ export interface AnimeWithEpisodes extends AnimeMetadata {
 
 export type UILanguage = 'ru' | 'en';
 
+export type SortOption = 'title' | 'score' | 'date' | 'size' | 'remaining';
+
 export interface AppSettings {
   scannedFolders: string[];
+  customFolders: string[]; // User created collections/folders
   playerType: 'system' | 'custom';
   customPlayerPath: string; // e.g. "C:\Program Files\mpv\mpv.exe"
   preferRussianTitles: boolean;
   autoScanOnStartup: boolean;
+  discordRpcEnabled: boolean;
+  autoTrackPlayback: boolean;
   uiLanguage: UILanguage;
   devMode: boolean;
 }
 
 export type ActiveView = 'library' | 'anime-detail' | 'settings';
 
-export type FilterStatus = 'ALL' | 'WATCHING' | 'COMPLETED' | 'AIRING' | 'MISSING';
+export type FilterStatus = 'ALL' | 'WATCHING' | 'COMPLETED' | 'MISSING';
 
 export interface ParseResult {
   title: string;
@@ -74,4 +82,11 @@ export interface ParseResult {
   releaseGroup?: string;
   crc?: string;
   originalFileName: string;
+}
+
+export interface RenameOperation {
+  oldPath: string;
+  newName: string;
+  animeId?: string;
+  episodeId?: string;
 }

@@ -1,4 +1,4 @@
-export const CURRENT_APP_VERSION = '1.0.1';
+export const CURRENT_APP_VERSION = '1.0.2';
 export const GITHUB_REPO = 'D1verlin/Checklister';
 export const GITHUB_REPO_URL = `https://github.com/${GITHUB_REPO}`;
 

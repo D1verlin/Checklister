@@ -15,6 +15,7 @@ import {
   Download,
   Sparkles,
   Database,
+  FolderPlus,
 } from 'lucide-react';
 import type { AppSettings, UILanguage } from '../types/index.ts';
 import { useI18n } from '../i18n/translations.ts';
@@ -27,6 +28,7 @@ import {
   GITHUB_REPO_URL,
   type UpdateInfo,
 } from '../services/updater.ts';
+import CheckListerLogo from '../assets/CheckLister.svg';
 
 interface SettingsViewProps {
   settings: AppSettings;
@@ -45,8 +47,14 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
   onRegisterActions,
   onClearLibrary,
 }) => {
-  const [form, setForm] = useState<AppSettings>({ ...settings });
+  const [form, setForm] = useState<AppSettings>({
+    ...settings,
+    customFolders: settings.customFolders || ['Шедевры', 'Посмотреть позже'],
+    discordRpcEnabled: settings.discordRpcEnabled ?? true,
+    autoTrackPlayback: settings.autoTrackPlayback ?? true,
+  });
   const [manualFolder, setManualFolder] = useState('');
+  const [newFolderInput, setNewFolderInput] = useState('');
   const [showSavedToast, setShowSavedToast] = useState(false);
   const [toastText, setToastText] = useState('');
   const [isCheckingUpdates, setIsCheckingUpdates] = useState(false);
@@ -55,6 +63,27 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const { t } = useI18n(form.uiLanguage);
+
+  const handleAddUserFolder = (e: React.FormEvent) => {
+    e.preventDefault();
+    const clean = newFolderInput.trim().slice(0, 12);
+    if (!clean || form.customFolders.includes(clean)) return;
+    const updated = { ...form, customFolders: [...form.customFolders, clean] };
+    setForm(updated);
+    onSave(updated);
+    setNewFolderInput('');
+    triggerToast(t('folderCreated'));
+  };
+
+  const handleDeleteUserFolder = (folderName: string) => {
+    const updated = {
+      ...form,
+      customFolders: form.customFolders.filter((f) => f !== folderName),
+    };
+    setForm(updated);
+    onSave(updated);
+    triggerToast(t('folderDeleted'));
+  };
 
   const handleCheckUpdates = async () => {
     setIsCheckingUpdates(true);
@@ -269,7 +298,68 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
           </div>
         </div>
 
-        {/* Section 2: Media Player (Uniform Full Width) */}
+        {/* Section 2: Custom User Folders (Uniform Full Width) */}
+        <div className="space-y-4 border-b border-white/5 pb-8 w-full">
+          <div className="flex items-center gap-2.5">
+            <FolderPlus size={16} className="text-[#DF8DC6]" />
+            <div>
+              <h2 className="text-sm font-semibold text-white">
+                {t('customFoldersTitle')}
+              </h2>
+              <p className="text-xs text-[#888888]">
+                {t('customFoldersDesc')}
+              </p>
+            </div>
+          </div>
+
+          <div className="flex flex-wrap gap-2">
+            {form.customFolders?.map((folder) => (
+              <div
+                key={folder}
+                className="flex items-center gap-2 px-3 py-1.5 rounded-[8px] bg-[#181818] border border-white/10 text-xs text-white"
+              >
+                <Folder size={13} className="text-[#888888]" />
+                <span>{folder}</span>
+                <button
+                  type="button"
+                  onClick={() => handleDeleteUserFolder(folder)}
+                  className="text-[#666666] hover:text-red-400 p-0.5 rounded transition-colors"
+                  title="Удалить"
+                >
+                  <Trash2 size={12} />
+                </button>
+              </div>
+            ))}
+          </div>
+
+          <form onSubmit={handleAddUserFolder} className="flex gap-2 w-full">
+            <div className="relative flex-1">
+              <input
+                type="text"
+                value={newFolderInput}
+                onChange={(e) => setNewFolderInput(e.target.value.slice(0, 12))}
+                maxLength={12}
+                placeholder={t('folderNamePlaceholder')}
+                className="input-dark w-full text-xs py-2 bg-[#161616] border-white/10 pr-10"
+              />
+              <span className={`absolute right-3 top-1/2 -translate-y-1/2 text-[10px] font-mono pointer-events-none ${
+                newFolderInput.length >= 12 ? 'text-amber-400' : 'text-[#444444]'
+              }`}>
+                {newFolderInput.length}/12
+              </span>
+            </div>
+            <button
+              type="submit"
+              disabled={!newFolderInput.trim()}
+              className="btn-secondary py-2 px-4 text-xs border-white/10 hover:border-white/20 shrink-0 gap-1.5"
+            >
+              <Plus size={13} />
+              <span>{t('btnCreateFolder')}</span>
+            </button>
+          </form>
+        </div>
+
+        {/* Section 3: Media Player (Uniform Full Width) */}
         <div className="space-y-4 border-b border-white/5 pb-8 relative z-20 w-full">
           <div className="flex items-center gap-2.5">
             <PlaySquare size={16} className="text-[#DF8DC6]" />
@@ -366,7 +456,57 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
           </div>
         </div>
 
-        {/* Section 4: Developer Tools (Uniform Full Width) */}
+        {/* Section 5: Automation & Integrations (Uniform Full Width) */}
+        <div className="space-y-4 border-b border-white/5 pb-8 w-full">
+          <div className="flex items-center gap-2.5">
+            <Sparkles size={16} className="text-[#DF8DC6]" />
+            <div>
+              <h2 className="text-sm font-semibold text-white">
+                {t('sectionAutomationTitle')}
+              </h2>
+              <p className="text-xs text-[#888888]">
+                {t('sectionAutomationDesc')}
+              </p>
+            </div>
+          </div>
+
+          <div className="space-y-3 w-full">
+            <div className="flex items-center justify-between gap-4 py-1">
+              <div>
+                <div className="text-xs font-medium text-white">
+                  {t('settingSmartTracking')}
+                </div>
+                <div className="text-[11px] text-[#888888]">
+                  {t('settingSmartTrackingDesc')}
+                </div>
+              </div>
+              <CustomCheckbox
+                checked={form.autoTrackPlayback}
+                onChange={(checked) => setForm({ ...form, autoTrackPlayback: checked })}
+              />
+            </div>
+
+            <div className="flex items-center justify-between gap-4 py-1 border-t border-white/5 pt-3">
+              <div>
+                <div className="text-xs font-medium text-white">
+                  {t('settingDiscordRpc')}
+                </div>
+                <div className="text-[11px] text-[#888888]">
+                  {t('settingDiscordRpcDesc')}
+                </div>
+              </div>
+              <CustomCheckbox
+                checked={form.discordRpcEnabled}
+                onChange={(checked) => {
+                  setForm({ ...form, discordRpcEnabled: checked });
+                  (window as any).electronAPI?.setDiscordRpcEnabled?.(checked);
+                }}
+              />
+            </div>
+          </div>
+        </div>
+
+        {/* Section 6: Developer Tools (Uniform Full Width) */}
         <div className="space-y-4 border-b border-white/5 pb-8 w-full">
           <div className="flex items-center gap-2.5">
             <Terminal size={16} className="text-[#DF8DC6]" />
@@ -458,7 +598,7 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
             <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-4 border-b border-white/5">
               <div className="flex items-center gap-3.5">
                 <img
-                  src="/CheckLister.svg"
+                  src={CheckListerLogo}
                   alt="CheckLister"
                   className="w-10 h-10 rounded-[8px] shrink-0"
                 />

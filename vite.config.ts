@@ -39,6 +39,17 @@ export default defineConfig(({ mode }) => {
             electron([
               {
                 entry: 'electron/main.ts',
+                vite: {
+                  define: {
+                    'process.env.WS_NO_BUFFER_UTIL': '"true"',
+                    'process.env.WS_NO_UTF_8_VALIDATE': '"true"',
+                  },
+                  build: {
+                    rollupOptions: {
+                      external: ['bufferutil', 'utf-8-validate'],
+                    },
+                  },
+                },
               },
             ]),
             renderer(),

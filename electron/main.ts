@@ -1,13 +1,29 @@
-import { app, BrowserWindow, ipcMain, dialog, shell, protocol, net } from 'electron';
+import { app, BrowserWindow, ipcMain, dialog, shell, protocol, net, nativeImage, type NativeImage } from 'electron';
 import path from 'node:path';
 import fs from 'node:fs';
 import { spawn, exec } from 'node:child_process';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 
+import {
+  initDiscordRpc,
+  setDiscordActivity,
+  clearDiscordActivity,
+  setDiscordRpcEnabled,
+  destroyDiscordRpc,
+} from './discord.ts';
+
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
 let mainWindow: BrowserWindow | null = null;
+
+interface ActivePlaybackSession {
+  filePath: string;
+  animeId?: string;
+  episodeId?: string;
+  startTime: number;
+}
+let currentPlayback: ActivePlaybackSession | null = null;
 
 const userDataPath = app.getPath('userData');
 const settingsFile = path.join(userDataPath, 'settings.json');
@@ -41,6 +57,31 @@ protocol.registerSchemesAsPrivileged([
   },
 ]);
 
+function getAppIcon(): NativeImage | undefined {
+  const appPath = app.getAppPath();
+  const candidates = [
+    path.join(appPath, 'public', 'icon.ico'),
+    path.join(appPath, 'build', 'icon.ico'),
+    path.join(appPath, 'public', 'icon.png'),
+    path.resolve(__dirname, '../public/icon.ico'),
+    path.resolve(__dirname, '../build/icon.ico'),
+    path.resolve(__dirname, '../public/icon.png'),
+    path.resolve(process.cwd(), 'public', 'icon.ico'),
+    path.resolve(process.cwd(), 'build', 'icon.ico'),
+    path.resolve(process.cwd(), 'public', 'icon.png'),
+  ];
+  for (const candidate of candidates) {
+    if (fs.existsSync(candidate)) {
+      const img = nativeImage.createFromPath(candidate);
+      if (!img.isEmpty()) {
+        console.log('[Electron] Loaded window icon from:', candidate);
+        return img;
+      }
+    }
+  }
+  return undefined;
+}
+
 function createWindow() {
   const preloadCandidate = path.resolve(__dirname, 'preload.cjs');
   const preloadCandidateFallback = path.resolve(process.cwd(), 'dist-electron', 'preload.cjs');
@@ -61,9 +102,7 @@ function createWindow() {
     frame: false,
     backgroundColor: '#121212',
     title: 'CheckLister',
-    icon: fs.existsSync(path.resolve(process.cwd(), 'public', 'icon.ico'))
-      ? path.resolve(process.cwd(), 'public', 'icon.ico')
-      : path.resolve(process.cwd(), 'public', 'icon.png'),
+    icon: getAppIcon(),
     webPreferences: {
       preload: preloadPath,
       sandbox: false,
@@ -74,6 +113,20 @@ function createWindow() {
 
   mainWindow.webContents.on('preload-error', (_event, pPath, err) => {
     console.error('[Electron] Preload error in', pPath, err);
+  });
+
+  mainWindow.on('focus', () => {
+    if (currentPlayback) {
+      const elapsedMs = Date.now() - currentPlayback.startTime;
+      if (elapsedMs >= 300000 && currentPlayback.animeId) {
+        mainWindow?.webContents.send('player:episodeWatched', {
+          animeId: currentPlayback.animeId,
+          episodeId: currentPlayback.episodeId,
+          filePath: currentPlayback.filePath,
+        });
+        currentPlayback = null;
+      }
+    }
   });
 
   mainWindow.on('maximize', () => {
@@ -222,38 +275,164 @@ ipcMain.handle('fs:scanDirectories', async (_event, folderPaths: string[]) => {
   return allFiles;
 });
 
-ipcMain.handle('player:openFile', async (_event, { filePath, playerType, customPath }) => {
-  if (!filePath) {
-    return { success: false, error: 'Empty file path' };
-  }
-
-  const exists = fs.existsSync(filePath);
-  if (!exists) {
-    return {
-      success: false,
-      error: `Файл не найден на диске: ${filePath}`,
-    };
-  }
-
-  try {
-    if (playerType === 'custom' && customPath && fs.existsSync(customPath)) {
-      const proc = spawn(customPath, [filePath], {
-        detached: true,
-        stdio: 'ignore',
-      });
-      proc.unref();
-      return { success: true };
-    } else {
-      // Launch default system player via shell.openPath to support Unicode / Cyrillic paths cleanly
-      const err = await shell.openPath(filePath);
-      if (err) {
-        return { success: false, error: err };
-      }
-      return { success: true };
+ipcMain.handle(
+  'player:openFile',
+  async (
+    _event,
+    {
+      filePath,
+      playerType,
+      customPath,
+      animeId,
+      episodeId,
+      animeTitle,
+      episodeNumber,
+      totalEpisodes,
+    }: {
+      filePath: string;
+      playerType?: string;
+      customPath?: string;
+      animeId?: string;
+      episodeId?: string;
+      animeTitle?: string;
+      episodeNumber?: number;
+      totalEpisodes?: number;
     }
-  } catch (err) {
-    return { success: false, error: (err as Error).message };
+  ) => {
+    if (!filePath) {
+      return { success: false, error: 'Empty file path' };
+    }
+
+    const exists = fs.existsSync(filePath);
+    if (!exists) {
+      return {
+        success: false,
+        error: `Файл не найден на диске: ${filePath}`,
+      };
+    }
+
+    currentPlayback = {
+      filePath,
+      animeId,
+      episodeId,
+      startTime: Date.now(),
+    };
+
+    if (animeTitle) {
+      const stateStr = totalEpisodes
+        ? `Серия ${episodeNumber || 1} из ${totalEpisodes}`
+        : `Серия ${episodeNumber || 1}`;
+      setDiscordActivity({
+        details: animeTitle,
+        state: stateStr,
+        startTimestamp: Date.now(),
+      });
+    }
+
+    try {
+      if (playerType === 'custom' && customPath && fs.existsSync(customPath)) {
+        const proc = spawn(customPath, [filePath], {
+          detached: false,
+          stdio: 'ignore',
+        });
+
+        proc.on('close', () => {
+          if (currentPlayback && currentPlayback.filePath === filePath) {
+            const elapsedMs = Date.now() - currentPlayback.startTime;
+            if (elapsedMs >= 180000 && currentPlayback.animeId) {
+              mainWindow?.webContents.send('player:episodeWatched', {
+                animeId: currentPlayback.animeId,
+                episodeId: currentPlayback.episodeId,
+                filePath: currentPlayback.filePath,
+              });
+            }
+            currentPlayback = null;
+          }
+          clearDiscordActivity();
+        });
+
+        return { success: true };
+      } else {
+        const err = await shell.openPath(filePath);
+        if (err) {
+          return { success: false, error: err };
+        }
+        return { success: true };
+      }
+    } catch (err) {
+      return { success: false, error: (err as Error).message };
+    }
   }
+);
+
+ipcMain.handle('fs:renameFiles', async (_event, operations: { oldPath: string; newName: string }[]) => {
+  const results: { oldPath: string; newPath: string; success: boolean; error?: string }[] = [];
+  const tempStages: { op: { oldPath: string; newName: string }; tempPath: string }[] = [];
+
+  // Phase 1: Pre-validation & Rename each file to a unique temporary name in the same directory.
+  // This frees all destination names and prevents Windows NTFS case-insensitivity collisions.
+  for (let i = 0; i < operations.length; i++) {
+    const op = operations[i];
+    try {
+      if (!fs.existsSync(op.oldPath)) {
+        results.push({ oldPath: op.oldPath, newPath: '', success: false, error: 'Исходный файл не найден' });
+        continue;
+      }
+      const dir = path.dirname(op.oldPath);
+      const ext = path.extname(op.oldPath);
+      const tempName = `.chk_tmp_${Date.now()}_${i}_${Math.random().toString(36).substring(2, 6)}${ext}`;
+      const tempPath = path.join(dir, tempName);
+
+      await fs.promises.rename(op.oldPath, tempPath);
+      tempStages.push({ op, tempPath });
+    } catch (err) {
+      results.push({ oldPath: op.oldPath, newPath: '', success: false, error: (err as Error).message });
+    }
+  }
+
+  // Phase 2: Final rename to the requested newName (with automatic duplicate-safe resolution if an external file exists)
+  for (const item of tempStages) {
+    const { op, tempPath } = item;
+    try {
+      const dir = path.dirname(op.oldPath);
+      let targetPath = path.join(dir, op.newName);
+
+      // If an existing file on disk already has this exact name, auto-number to avoid data loss and collision error:
+      if (fs.existsSync(targetPath)) {
+        const parsed = path.parse(op.newName);
+        let counter = 1;
+        while (fs.existsSync(targetPath)) {
+          targetPath = path.join(dir, `${parsed.name} (${counter})${parsed.ext}`);
+          counter++;
+        }
+      }
+
+      await fs.promises.rename(tempPath, targetPath);
+      results.push({ oldPath: op.oldPath, newPath: targetPath, success: true });
+    } catch (err) {
+      // If final rename fails, attempt to restore to original path
+      try {
+        if (fs.existsSync(tempPath) && !fs.existsSync(op.oldPath)) {
+          await fs.promises.rename(tempPath, op.oldPath);
+        }
+      } catch {}
+      results.push({ oldPath: op.oldPath, newPath: '', success: false, error: (err as Error).message });
+    }
+  }
+
+  return results;
+});
+
+ipcMain.handle('discord:setActivity', async (_event, activity) => {
+  return setDiscordActivity(activity);
+});
+
+ipcMain.handle('discord:clearActivity', async () => {
+  return clearDiscordActivity();
+});
+
+ipcMain.handle('discord:setEnabled', async (_event, enabled: boolean) => {
+  return setDiscordRpcEnabled(enabled);
 });
 
 ipcMain.handle('explorer:showItem', async (_event, filePath: string) => {
@@ -488,6 +667,7 @@ app.whenReady().then(() => {
   });
 
   createWindow();
+  initDiscordRpc();
 
   app.on('activate', () => {
     if (BrowserWindow.getAllWindows().length === 0) createWindow();
@@ -495,6 +675,7 @@ app.whenReady().then(() => {
 });
 
 app.on('window-all-closed', () => {
+  destroyDiscordRpc();
   if (process.platform !== 'darwin') {
     app.quit();
   }

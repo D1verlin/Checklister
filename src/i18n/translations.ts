@@ -8,11 +8,10 @@ export const translations = {
     navSettings: 'Настройки',
     navDev: 'Консоль Dev',
 
-    // Filters
+    // Filters (Airing removed)
     filterAll: 'Все тайтлы',
     filterWatching: 'Смотрю',
     filterCompleted: 'Завершено',
-    filterAiring: 'Онгоинги',
     filterMissing: 'Потерянные файлы',
 
     // Header & Actions
@@ -26,7 +25,7 @@ export const translations = {
     // Card & Status
     statusWatching: 'Смотрится',
     statusCompleted: 'Завершено',
-    statusAiring: 'Онгоинг',
+    statusAiring: 'Выходит',
     statusMissing: 'Файл не найден',
     btnContinue: 'Продолжить',
     btnShowFolder: 'Открыть папку',
@@ -51,6 +50,71 @@ export const translations = {
     noEpisodesDiscovered: 'В этой папке видеофайлы не найдены.',
     allEpisodesWatched: 'Все серии просмотрены',
     watchProgress: 'Прогресс просмотра',
+
+    // Sort Options
+    sortBy: 'Сортировка:',
+    sortTitle: 'По названию (А-Я)',
+    sortScore: 'По рейтингу (высокий)',
+    sortDate: 'По дате добавления',
+    sortSize: 'По размеру на диске',
+    sortRemaining: 'По оставшимся сериям',
+
+    // User Folders / Collections
+    folderAll: 'Все папки',
+    customFoldersTitle: 'Пользовательские папки',
+    customFoldersDesc: 'Организуйте тайтлы по своим папкам, спискам и коллекциям.',
+    btnCreateFolder: 'Создать папку',
+    folderNamePlaceholder: 'Название новой папки...',
+    manageFolders: 'Управление папками',
+    noAnimeInFolder: 'В этой папке пока нет аниме',
+    noAnimeInFolderDesc: 'Назначьте тайтлы в эту папку в карточке или в деталях аниме.',
+    addToFolder: 'Папки коллекции',
+    removeFromFolder: 'Убрать из папки',
+    folderCreated: 'Папка создана',
+    folderDeleted: 'Папка удалена',
+    selectFolderHint: 'Выберите папки для этого аниме:',
+
+    // Gap Detection
+    missingEpisodesWarning: 'Пропущена серия',
+    missingEpisodesBanner: 'Внимание: в локальной папке отсутствуют серии:',
+    gapBetweenEpisodes: 'Пропущена серия',
+
+    // Disk Usage
+    diskUsageLabel: 'Размер на диске',
+
+    // Batch Renamer
+    btnBatchRename: 'Переименовать файлы',
+    batchRenameTitle: 'Пакетное переименование файлов',
+    batchRenameDesc: 'Безопасное переименование видеофайлов по выбранному стандарту.',
+    templatePresetLabel: 'Шаблон имени',
+    presetStandard: 'Название - 01.ext',
+    presetSeason: 'Название - S01E01.ext',
+    presetRussian: 'Название - Серия 01.ext',
+    presetSimple: 'Эпизод 01.ext',
+    titleSourceLabel: 'Название в имени файлов:',
+    titleSourceRussian: 'Русское (Shikimori)',
+    titleSourceRomaji: 'Ромадзи (AniList)',
+    titleSourceFolder: 'Имя папки',
+    previewOriginal: 'Текущее имя файла',
+    previewNew: 'Новое имя файла',
+    btnApplyRename: 'Применить переименование',
+    renamingInProgress: 'Переименование файлов...',
+    renameSuccessToast: 'Файлы успешно переименованы',
+    renameErrorToast: 'Ошибка при переименовании файлов',
+
+    // Automation & Discord RPC
+    sectionAutomationTitle: 'Автоматизация и интеграции',
+    sectionAutomationDesc: 'Фоновый трекинг завершения просмотра и отображение статуса в Discord.',
+    settingSmartTracking: 'Умный авто-трекинг воспроизведения',
+    settingSmartTrackingDesc: 'Автоматически отмечать серию просмотренной после закрытия плеера или длительного просмотра.',
+    settingDiscordRpc: 'Discord Rich Presence (RPC)',
+    settingDiscordRpcDesc: 'Транслировать текущий просматриваемый тайтл, номер серии и прогресс в профиль Discord.',
+    watchedAutoToast: 'Серия автоматически отмечена как просмотренная',
+    btnContinueWatchingEp: 'Продолжить',
+
+    // Genres & Studios Filtering
+    filterGenreAll: 'Все жанры',
+    filterStudioAll: 'Все студии',
 
     // Settings View
     settingsTitle: 'Настройки приложения',
@@ -134,8 +198,6 @@ export const translations = {
     emptyWatchingDesc: 'Здесь появятся аниме, просмотр которых вы уже начали.',
     emptyCompletedTitle: 'Нет завершенных тайтлов',
     emptyCompletedDesc: 'После просмотра всех эпизодов тайтл переместится в эту категорию.',
-    emptyAiringTitle: 'Нет онгоингов',
-    emptyAiringDesc: 'В коллекции нет сериалов со статусом продолжающегося релиза.',
     emptyMissingTitle: 'Потерянных файлов нет',
     emptyMissingDesc: 'Все распознанные видеофайлы присутствуют на диске.',
   },
@@ -147,11 +209,10 @@ export const translations = {
     navSettings: 'Settings',
     navDev: 'Dev Console',
 
-    // Filters
+    // Filters (Airing removed)
     filterAll: 'All Titles',
     filterWatching: 'Watching',
     filterCompleted: 'Completed',
-    filterAiring: 'Airing',
     filterMissing: 'Missing Files',
 
     // Header & Actions
@@ -190,6 +251,71 @@ export const translations = {
     noEpisodesDiscovered: 'No video files discovered in this folder.',
     allEpisodesWatched: 'All episodes watched',
     watchProgress: 'Watch Progress',
+
+    // Sort Options
+    sortBy: 'Sort by:',
+    sortTitle: 'Title (A-Z)',
+    sortScore: 'Rating (Highest)',
+    sortDate: 'Date Added',
+    sortSize: 'Size on Disk',
+    sortRemaining: 'Remaining Episodes',
+
+    // User Folders / Collections
+    folderAll: 'All Folders',
+    customFoldersTitle: 'Custom Folders',
+    customFoldersDesc: 'Organize your library with custom collections and lists.',
+    btnCreateFolder: 'Create Folder',
+    folderNamePlaceholder: 'New folder name...',
+    manageFolders: 'Manage Folders',
+    noAnimeInFolder: 'No anime in this folder yet',
+    noAnimeInFolderDesc: 'Assign anime to this folder from the card or anime detail page.',
+    addToFolder: 'Custom Folders',
+    removeFromFolder: 'Remove from folder',
+    folderCreated: 'Folder created',
+    folderDeleted: 'Folder deleted',
+    selectFolderHint: 'Select folders for this anime:',
+
+    // Gap Detection
+    missingEpisodesWarning: 'Missing Episode',
+    missingEpisodesBanner: 'Warning: missing local episodes:',
+    gapBetweenEpisodes: 'Missing Episode',
+
+    // Disk Usage
+    diskUsageLabel: 'Size on disk',
+
+    // Batch Renamer
+    btnBatchRename: 'Batch Rename',
+    batchRenameTitle: 'Batch File Renamer',
+    batchRenameDesc: 'Safely rename video files of this anime using a standard template.',
+    templatePresetLabel: 'Naming Template',
+    presetStandard: 'Title - 01.ext',
+    presetSeason: 'Title - S01E01.ext',
+    presetRussian: 'Title - Episode 01.ext',
+    presetSimple: 'Episode 01.ext',
+    titleSourceLabel: 'Title in file name:',
+    titleSourceRussian: 'Russian (Shikimori)',
+    titleSourceRomaji: 'Romaji (AniList)',
+    titleSourceFolder: 'Folder Name',
+    previewOriginal: 'Current File Name',
+    previewNew: 'New File Name',
+    btnApplyRename: 'Apply Rename',
+    renamingInProgress: 'Renaming files...',
+    renameSuccessToast: 'Files renamed successfully',
+    renameErrorToast: 'Error renaming files',
+
+    // Automation & Discord RPC
+    sectionAutomationTitle: 'Automation & Integrations',
+    sectionAutomationDesc: 'Playback completion tracking and Discord RPC profile activity.',
+    settingSmartTracking: 'Smart Playback Tracking',
+    settingSmartTrackingDesc: 'Automatically mark episode as watched when player closes or after watching.',
+    settingDiscordRpc: 'Discord Rich Presence (RPC)',
+    settingDiscordRpcDesc: 'Broadcast currently playing anime, episode number, and progress to Discord.',
+    watchedAutoToast: 'Episode automatically marked as watched',
+    btnContinueWatchingEp: 'Continue',
+
+    // Genres & Studios Filtering
+    filterGenreAll: 'All Genres',
+    filterStudioAll: 'All Studios',
 
     // Settings View
     settingsTitle: 'Application Settings',
@@ -273,8 +399,6 @@ export const translations = {
     emptyWatchingDesc: 'Shows that you have started watching will appear here.',
     emptyCompletedTitle: 'No completed anime yet',
     emptyCompletedDesc: 'Once you watch all episodes of an anime, it moves here.',
-    emptyAiringTitle: 'No airing anime',
-    emptyAiringDesc: 'No shows with releasing status discovered in your collection.',
     emptyMissingTitle: 'No missing files',
     emptyMissingDesc: 'All recognized video files are verified on disk.',
   },

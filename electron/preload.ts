@@ -3,8 +3,12 @@ import { contextBridge, ipcRenderer } from 'electron';
 contextBridge.exposeInMainWorld('electronAPI', {
   openFolderDialog: () => ipcRenderer.invoke('dialog:openFolders'),
   scanDirectories: (folders: string[]) => ipcRenderer.invoke('fs:scanDirectories', folders),
-  openVideo: (filePath: string, playerType: 'system' | 'custom', customPath?: string) =>
-    ipcRenderer.invoke('player:openFile', { filePath, playerType, customPath }),
+  openVideo: (filePathOrOptions: string | any, playerType?: 'system' | 'custom', customPath?: string) => {
+    if (typeof filePathOrOptions === 'object' && filePathOrOptions !== null) {
+      return ipcRenderer.invoke('player:openFile', filePathOrOptions);
+    }
+    return ipcRenderer.invoke('player:openFile', { filePath: filePathOrOptions, playerType, customPath });
+  },
   showInFolder: (filePath: string) => ipcRenderer.invoke('explorer:showItem', filePath),
   saveSettings: (settings: any) => ipcRenderer.invoke('storage:saveSettings', settings),
   loadSettings: () => ipcRenderer.invoke('storage:loadSettings'),

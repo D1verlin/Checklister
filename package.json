@@ -1,6 +1,6 @@
 {
   "name": "checklister",
-  "version": "1.0.1",
+  "version": "1.0.2",
   "description": "Minimalist Offline Anime Tracker & Local Media Library",
   "author": "D1verlin",
   "license": "MIT",
@@ -24,7 +24,8 @@
     "appId": "com.checklister.app",
     "productName": "CheckLister",
     "directories": {
-      "output": "release"
+      "output": "release",
+      "buildResources": "build"
     },
     "files": [
       "dist/**/*",
@@ -37,17 +38,21 @@
         "nsis",
         "portable"
       ],
-      "icon": "public/icon.ico"
+      "icon": "build/icon.ico"
     },
     "nsis": {
       "oneClick": false,
       "allowToChangeInstallationDirectory": true,
       "createDesktopShortcut": true,
       "createStartMenuShortcut": true,
-      "shortcutName": "CheckLister"
+      "shortcutName": "CheckLister",
+      "installerIcon": "build/icon.ico",
+      "uninstallerIcon": "build/icon.ico",
+      "installerHeaderIcon": "build/icon.ico"
     }
   },
   "dependencies": {
+    "@xhayper/discord-rpc": "^1.3.4",
     "clsx": "^2.1.1",
     "lucide-react": "^1.16.0",
     "react": "^18.3.1",

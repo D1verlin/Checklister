@@ -10,7 +10,7 @@ export async function openVideoFile(filePath: string): Promise<{ success: boolea
 
   if (electron?.openVideo) {
     const res = await electron.openVideo(filePath, settings.playerType, settings.customPlayerPath);
-    return res;
+    return res || { success: true };
   }
 
   // Web fallback simulation

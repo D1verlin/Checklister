@@ -4,16 +4,16 @@ import {
   Search,
   X,
   RefreshCw,
-  FolderPlus,
   Settings,
-  Languages,
   Minus,
   Square,
-  HardDrive,
-  Terminal,
   Edit3,
   ExternalLink,
   Save,
+  Folder,
+  Check,
+  PanelLeftOpen,
+  PanelLeftClose,
 } from 'lucide-react';
 import type {
   ActiveView,
@@ -22,6 +22,7 @@ import type {
   AnimeWithEpisodes,
 } from '../types/index.ts';
 import { useI18n } from '../i18n/translations.ts';
+import CheckListerLogo from '../assets/CheckLister.svg';
 
 interface UnifiedHeaderProps {
   activeView: ActiveView;
@@ -37,12 +38,17 @@ interface UnifiedHeaderProps {
   onScan: () => void;
   onAddFolder: () => void;
   uiLanguage: UILanguage;
-  onToggleLanguage: () => void;
   preferRussian: boolean;
   devMode: boolean;
   onOpenRemap?: () => void;
   onSaveSettings?: () => void;
   onScanSettings?: () => void;
+  customFolders?: string[];
+  selectedUserFolder?: string | null;
+  onSelectUserFolder?: (folder: string | null) => void;
+  isFilterSidebarOpen?: boolean;
+  onToggleFilterSidebar?: () => void;
+  activeFiltersCount?: number;
 }
 
 export const UnifiedHeader: React.FC<UnifiedHeaderProps> = ({
@@ -55,20 +61,32 @@ export const UnifiedHeader: React.FC<UnifiedHeaderProps> = ({
   animeList,
   selectedAnime,
   isScanning,
-  scanProgressText,
   onScan,
   onAddFolder,
   uiLanguage,
-  onToggleLanguage,
   preferRussian,
-  devMode,
   onOpenRemap,
   onSaveSettings,
   onScanSettings,
+  customFolders = [],
+  selectedUserFolder = null,
+  onSelectUserFolder,
+  isFilterSidebarOpen,
+  onToggleFilterSidebar,
+  activeFiltersCount = 0,
 }) => {
   const { t } = useI18n(uiLanguage);
   const [isMaximized, setIsMaximized] = useState(false);
-  const electron = (window as any).electronAPI;
+  const [folderOpen, setFolderOpen] = useState(false);
+
+  useEffect(() => {
+    function handleClickOutside(e: MouseEvent) {
+      const folderEl = (e.target as Element).closest('[data-folder-dropdown]');
+      if (!folderEl) setFolderOpen(false);
+    }
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, []);
 
   useEffect(() => {
     const electron = (window as any).electronAPI;
@@ -86,9 +104,7 @@ export const UnifiedHeader: React.FC<UnifiedHeaderProps> = ({
   const handleMinimize = (e?: React.MouseEvent) => {
     e?.stopPropagation();
     const electron = (window as any).electronAPI;
-    if (electron?.windowControls?.minimize) {
-      electron.windowControls.minimize();
-    }
+    electron?.windowControls?.minimize?.();
   };
 
   const handleMaximize = async (e?: React.MouseEvent) => {
@@ -97,49 +113,31 @@ export const UnifiedHeader: React.FC<UnifiedHeaderProps> = ({
     if (electron?.windowControls?.maximize) {
       const max = await electron.windowControls.maximize();
       setIsMaximized(max);
-    } else {
-      // Browser fallback (toggle fullscreen)
-      if (!document.fullscreenElement) {
-        document.documentElement.requestFullscreen().then(() => setIsMaximized(true)).catch(() => {});
-      } else {
-        document.exitFullscreen().then(() => setIsMaximized(false)).catch(() => {});
-      }
     }
   };
 
   const handleClose = (e?: React.MouseEvent) => {
     e?.stopPropagation();
     const electron = (window as any).electronAPI;
-    if (electron?.windowControls?.close) {
-      electron.windowControls.close();
-    } else {
-      window.close();
-    }
-  };
-
-  const handleToggleDevTools = (e?: React.MouseEvent) => {
-    e?.stopPropagation();
-    const electron = (window as any).electronAPI;
-    electron?.toggleDevTools?.();
+    electron?.windowControls?.close?.();
   };
 
   const counts = {
     ALL: animeList.length,
-    WATCHING: animeList.filter(a => !a.isCompleted && a.watchedCount > 0).length,
-    COMPLETED: animeList.filter(a => a.isCompleted).length,
-    AIRING: animeList.filter(a => a.airingStatus === 'RELEASING').length,
-    MISSING: animeList.filter(a => a.hasMissingFiles).length,
+    WATCHING: animeList.filter((a) => !a.isCompleted && a.watchedCount > 0).length,
+    COMPLETED: animeList.filter((a) => a.isCompleted).length,
+    MISSING: animeList.filter((a) => a.hasMissingFiles).length,
   };
 
   const filterItems: { id: FilterStatus; label: string }[] = [
     { id: 'ALL', label: t('filterAll') },
     { id: 'WATCHING', label: t('filterWatching') },
     { id: 'COMPLETED', label: t('filterCompleted') },
-    { id: 'AIRING', label: t('filterAiring') },
   ];
   if (counts.MISSING > 0) {
     filterItems.push({ id: 'MISSING', label: t('filterMissing') });
   }
+
 
   const displayDetailTitle = selectedAnime
     ? ((preferRussian || uiLanguage === 'ru') && selectedAnime.titleRussian)
@@ -152,7 +150,6 @@ export const UnifiedHeader: React.FC<UnifiedHeaderProps> = ({
       className="absolute top-0 left-0 right-0 h-14 w-full flex items-center justify-between px-4 select-none shrink-0 z-40 transition-all drag-region bg-[#121212]/60 backdrop-blur-md border-b border-white/10 shadow-sm"
       style={{ WebkitAppRegion: 'drag' } as any}
       onDoubleClick={(e) => {
-        // Only maximize if double clicked on the header bar itself, not interactive children
         if (e.target === e.currentTarget) {
           handleMaximize();
         }
@@ -166,9 +163,9 @@ export const UnifiedHeader: React.FC<UnifiedHeaderProps> = ({
         {activeView === 'library' ? (
           <>
             {/* Logo */}
-            <div className="flex items-center gap-2 pr-2">
+            <div className="flex items-center gap-2 pr-1">
               <img
-                src="/CheckLister.svg"
+                src={CheckListerLogo}
                 alt="CheckLister"
                 className="w-5 h-5 rounded-[5px] shrink-0"
               />
@@ -177,7 +174,36 @@ export const UnifiedHeader: React.FC<UnifiedHeaderProps> = ({
               </span>
             </div>
 
-            {/* Seamless Filter Tabs */}
+            {/* Sidebar Panel Toggle — логично рядом с логотипом, перед статусами */}
+            {onToggleFilterSidebar && (
+              <button
+                type="button"
+                onClick={onToggleFilterSidebar}
+                title={isFilterSidebarOpen
+                  ? (activeFiltersCount > 0 ? `Скрыть панель (активно фильтров: ${activeFiltersCount})` : 'Скрыть панель')
+                  : (activeFiltersCount > 0 ? `Показать панель (активно фильтров: ${activeFiltersCount})` : 'Показать панель')}
+                className={`btn-icon w-8 h-8 relative border-transparent transition-colors ${
+                  activeFiltersCount > 0
+                    ? 'text-white hover:text-white hover:border-white/10'
+                    : isFilterSidebarOpen
+                      ? 'text-white/70 hover:text-white hover:border-white/10'
+                      : 'text-[#888888] hover:text-white hover:border-white/10'
+                }`}
+              >
+                {isFilterSidebarOpen
+                  ? <PanelLeftClose size={15} />
+                  : <PanelLeftOpen size={15} />
+                }
+                {activeFiltersCount > 0 && (
+                  <span className="absolute top-0.5 right-0.5 w-[6px] h-[6px] rounded-full bg-white" />
+                )}
+              </button>
+            )}
+
+            {/* Separator */}
+            <div className="w-px h-4 bg-white/10" />
+
+            {/* Status Filter Tabs */}
             <nav className="flex items-center gap-1">
               {filterItems.map((item) => {
                 const isActive = currentFilter === item.id && !searchQuery;
@@ -224,34 +250,93 @@ export const UnifiedHeader: React.FC<UnifiedHeaderProps> = ({
         )}
       </div>
 
-      {/* Center Section: Airy Search Bar (only in library) */}
+      {/* Center Section: Search Bar & Controls (only in library) */}
       <div
-        className="flex-1 max-w-md mx-4"
+        className="flex-1 max-w-lg mx-3 flex items-center gap-2"
         style={{ WebkitAppRegion: 'no-drag' } as any}
       >
-        {activeView === 'library' ? (
-          <div className="relative w-full">
-            <Search
-              size={15}
-              className="absolute left-4 top-1/2 -translate-y-1/2 text-[#888888] pointer-events-none"
-            />
-            <input
-              type="text"
-              value={searchQuery}
-              onChange={(e) => onSearchChange(e.target.value)}
-              placeholder={t('searchPlaceholder')}
-              className="input-dark w-full !pl-12 !pr-10 !py-1.5 text-xs bg-white/5 hover:bg-white/[0.08] focus:bg-[#161616] rounded-[8px] border-white/10 focus:border-white transition-all"
-            />
-            {searchQuery && (
-              <button
-                onClick={() => onSearchChange('')}
-                className="absolute right-3 top-1/2 -translate-y-1/2 text-[#888888] hover:text-white"
-              >
-                <X size={13} />
-              </button>
+        {activeView === 'library' && (
+          <>
+            {/* Search Input */}
+            <div className="relative flex-1">
+              <Search
+                size={14}
+                className="absolute left-3.5 top-1/2 -translate-y-1/2 text-[#888888] pointer-events-none"
+              />
+              <input
+                type="text"
+                value={searchQuery}
+                onChange={(e) => onSearchChange(e.target.value)}
+                placeholder={t('searchPlaceholder')}
+                className="input-dark w-full !pl-10 !pr-9 !py-1 text-xs bg-white/5 hover:bg-white/[0.08] focus:bg-[#161616] rounded-[8px] border-white/10 focus:border-white transition-all font-sans"
+              />
+              {searchQuery && (
+                <button
+                  onClick={() => onSearchChange('')}
+                  className="absolute right-3 top-1/2 -translate-y-1/2 text-[#888888] hover:text-white"
+                >
+                  <X size={12} />
+                </button>
+              )}
+            </div>
+
+            {/* User Folders Dropdown */}
+            {customFolders.length > 0 && onSelectUserFolder && (
+              <div data-folder-dropdown className="relative shrink-0">
+                <button
+                  type="button"
+                  onClick={() => setFolderOpen(!folderOpen)}
+                  className={`flex items-center gap-1.5 px-2.5 py-1 rounded-[8px] text-xs border transition-all w-[130px] ${
+                    selectedUserFolder
+                      ? 'bg-white/15 text-white border-white/25 font-semibold'
+                      : 'bg-white/5 text-[#888888] hover:text-white border-white/10'
+                  }`}
+                  title={t('customFoldersTitle')}
+                >
+                  <Folder size={12} className={`shrink-0 ${selectedUserFolder ? 'text-white' : 'text-[#888888]'}`} />
+                  <span className="flex-1 text-left">{selectedUserFolder || t('folderAll')}</span>
+                </button>
+
+                {folderOpen && (
+                  <div className="absolute left-0 mt-1.5 w-[130px] rounded-[8px] bg-[#181818] border border-white/15 shadow-2xl py-1 z-50 animate-in fade-in zoom-in-95 duration-100">
+                    <button
+                      type="button"
+                      onClick={() => {
+                        onSelectUserFolder(null);
+                        setFolderOpen(false);
+                      }}
+                      className={`w-full px-3 py-1.5 text-xs text-left flex items-center justify-between transition-colors ${
+                        !selectedUserFolder ? 'bg-white/10 text-white font-semibold' : 'text-[#888888] hover:text-white hover:bg-white/5'
+                      }`}
+                    >
+                      <span>{t('folderAll')}</span>
+                      {!selectedUserFolder && <Check size={12} />}
+                    </button>
+                    {customFolders.map((f) => {
+                      const isSel = selectedUserFolder === f;
+                      return (
+                        <button
+                          key={f}
+                          type="button"
+                          onClick={() => {
+                            onSelectUserFolder(f);
+                            setFolderOpen(false);
+                          }}
+                          className={`w-full px-3 py-1.5 text-xs text-left flex items-center justify-between transition-colors ${
+                            isSel ? 'bg-white/10 text-white font-semibold' : 'text-[#888888] hover:text-white hover:bg-white/5'
+                          }`}
+                        >
+                          <span>{f}</span>
+                          {isSel && <Check size={12} />}
+                        </button>
+                      );
+                    })}
+                  </div>
+                )}
+              </div>
             )}
-          </div>
-        ) : null}
+          </>
+        )}
       </div>
 
       {/* Right Section: Actions + Window Controls */}
@@ -261,34 +346,6 @@ export const UnifiedHeader: React.FC<UnifiedHeaderProps> = ({
       >
         {activeView === 'library' && (
           <>
-            {/* Language Switcher */}
-            <button
-              onClick={onToggleLanguage}
-              title={uiLanguage === 'ru' ? 'Switch to English' : 'Переключить на русский'}
-              className="px-2.5 py-1 rounded-[6px] text-xs font-mono text-[#888888] hover:text-white hover:bg-white/5 transition-colors"
-            >
-              {uiLanguage.toUpperCase()}
-            </button>
-
-            {/* Scan Button */}
-            <button
-              onClick={onScan}
-              disabled={isScanning}
-              className="btn-icon w-8 h-8 text-[#888888] hover:text-white border-transparent hover:border-white/10"
-              title={t('btnScan')}
-            >
-              <RefreshCw size={14} className={isScanning ? 'animate-spin' : ''} />
-            </button>
-
-            {/* Add Folder */}
-            <button
-              onClick={onAddFolder}
-              className="btn-icon w-8 h-8 text-[#888888] hover:text-white border-transparent hover:border-white/10"
-              title={t('btnAddFolder')}
-            >
-              <FolderPlus size={14} />
-            </button>
-
             {/* Settings */}
             <button
               onClick={() => onViewChange('settings')}
@@ -363,40 +420,33 @@ export const UnifiedHeader: React.FC<UnifiedHeaderProps> = ({
           </div>
         )}
 
-        {/* Vertical Divider before Window Controls */}
+        {/* Separator before window controls */}
         <div className="w-[1px] h-4 bg-white/10 mx-1" />
 
-        {/* Window Controls */}
-        <div
-          className="flex items-center gap-0.5 no-drag-region"
-          style={{ WebkitAppRegion: 'no-drag' } as any}
-        >
+        {/* Windows Caption Controls */}
+        <div className="flex items-center">
           <button
-            type="button"
             onClick={handleMinimize}
-            className="w-7 h-7 rounded-[5px] flex items-center justify-center text-[#888888] hover:text-white hover:bg-white/5 transition-colors no-drag-region cursor-pointer"
-            style={{ WebkitAppRegion: 'no-drag' } as any}
+            className="w-8 h-8 rounded-[6px] flex items-center justify-center text-[#888888] hover:text-white hover:bg-white/5 transition-colors"
             title="Minimize"
           >
-            <Minus size={13} className="pointer-events-none" />
+            <Minus size={13} />
           </button>
+
           <button
-            type="button"
             onClick={handleMaximize}
-            className="w-7 h-7 rounded-[5px] flex items-center justify-center text-[#888888] hover:text-white hover:bg-white/5 transition-colors no-drag-region cursor-pointer"
-            style={{ WebkitAppRegion: 'no-drag' } as any}
-            title={isMaximized ? 'Restore' : 'Maximize'}
+            className="w-8 h-8 rounded-[6px] flex items-center justify-center text-[#888888] hover:text-white hover:bg-white/5 transition-colors"
+            title="Maximize"
           >
-            <Square size={11} className="pointer-events-none" />
+            <Square size={11} className={isMaximized ? 'opacity-80' : ''} />
           </button>
+
           <button
-            type="button"
             onClick={handleClose}
-            className="w-7 h-7 rounded-[5px] flex items-center justify-center text-[#888888] hover:text-white hover:bg-[#D32F2F] transition-colors no-drag-region cursor-pointer"
-            style={{ WebkitAppRegion: 'no-drag' } as any}
+            className="w-8 h-8 rounded-[6px] flex items-center justify-center text-[#888888] hover:text-white hover:bg-[#E81123] transition-colors"
             title="Close"
           >
-            <X size={13} className="pointer-events-none" />
+            <X size={13} />
           </button>
         </div>
       </div>

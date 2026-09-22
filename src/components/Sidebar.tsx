@@ -24,7 +24,6 @@ export const Sidebar: React.FC<SidebarProps> = ({
     ALL: animeList.length,
     WATCHING: animeList.filter(a => !a.isCompleted && a.watchedCount > 0).length,
     COMPLETED: animeList.filter(a => a.isCompleted).length,
-    AIRING: animeList.filter(a => a.airingStatus === 'RELEASING').length,
     MISSING: animeList.filter(a => a.hasMissingFiles).length,
   };
 
@@ -32,7 +31,6 @@ export const Sidebar: React.FC<SidebarProps> = ({
     { id: 'ALL', label: 'All Titles', icon: LayoutGrid },
     { id: 'WATCHING', label: 'Watching', icon: Play },
     { id: 'COMPLETED', label: 'Completed', icon: Check },
-    { id: 'AIRING', label: 'Airing', icon: Clock },
   ];
 
   if (counts.MISSING > 0) {
