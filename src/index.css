@@ -1,0 +1,252 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  /* Surfaces */
+  --bg-app:       #121212;
+  --bg-surface:   #121212;
+  --bg-surface-2: #1c1c1c;
+  --bg-surface-3: #161616;
+
+  /* Accent & Typography */
+  --accent:       #FFFFFF;
+  --accent-fg:    #000000;
+  --text-primary: #E0E0E0;
+  --text-sec:     #888888;
+
+  /* Borders & Shadows */
+  --border:       rgba(255, 255, 255, 0.08);
+  --border-hover: rgba(255, 255, 255, 0.16);
+  --shadow:       0 4px 12px rgba(0, 0, 0, 0.5);
+  --shadow-lg:    0 8px 24px rgba(0, 0, 0, 0.65);
+
+  /* Fonts */
+  --font-sans:    'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+  --font-mono:    'JetBrains Mono', 'Fira Code', monospace;
+
+  /* Radii & Motion */
+  --r-sm: 6px;
+  --r-md: 10px;
+  --r-lg: 14px;
+  --t:    all 0.15s ease;
+}
+
+/* Brand Gradient Text (0% #CFCFCF to 100% #DF8DC6) */
+.text-gradient-brand {
+  background: linear-gradient(135deg, #CFCFCF 0%, #DF8DC6 100%);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+  display: inline-block;
+}
+
+body {
+  background-color: var(--bg-app);
+  color: var(--text-primary);
+  font-family: var(--font-sans);
+  margin: 0;
+  padding: 0;
+  overflow: hidden;
+  user-select: none;
+  -webkit-user-select: none;
+}
+
+/* Custom Scrollbar */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+::-webkit-scrollbar-track {
+  background: #121212;
+}
+::-webkit-scrollbar-thumb {
+  background: rgba(255, 255, 255, 0.15);
+  border-radius: 3px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: rgba(255, 255, 255, 0.3);
+}
+
+/* Electron Frameless Window Drag / No-Drag Rules */
+.drag-region {
+  -webkit-app-region: drag;
+}
+
+.no-drag-region,
+.no-drag-region *,
+button,
+button *,
+input,
+input *,
+a,
+a * {
+  -webkit-app-region: no-drag;
+}
+
+@keyframes darkShimmer {
+  0% {
+    background-position: -200% 0;
+  }
+  100% {
+    background-position: 200% 0;
+  }
+}
+
+@layer components {
+  /* Glass Panels & Overlays */
+  .glass-panel {
+    background: rgba(26, 26, 26, 0.75);
+    backdrop-filter: blur(16px) saturate(140%);
+    -webkit-backdrop-filter: blur(16px) saturate(140%);
+    border: 1px solid rgba(255, 255, 255, 0.08);
+  }
+
+  .glass-panel-subtle {
+    background: rgba(18, 18, 18, 0.65);
+    backdrop-filter: blur(16px) saturate(140%);
+    -webkit-backdrop-filter: blur(16px) saturate(140%);
+    border: 1px solid rgba(255, 255, 255, 0.08);
+  }
+
+  .glass-overlay {
+    background: rgba(0, 0, 0, 0.75);
+    backdrop-filter: blur(8px);
+    -webkit-backdrop-filter: blur(8px);
+    border-radius: 6px;
+    border: 1px solid rgba(255, 255, 255, 0.08);
+  }
+
+  /* Dark Monolith Minimalist Shimmer Skeleton */
+  .skeleton-shimmer {
+    background: linear-gradient(90deg, #141414 0%, #202020 50%, #141414 100%);
+    background-size: 200% 100%;
+    animation: darkShimmer 1.8s infinite ease-in-out;
+  }
+
+  /* Buttons */
+  .btn-primary {
+    background-color: var(--accent);
+    color: var(--accent-fg);
+    font-weight: 500;
+    font-size: 13px;
+    border-radius: var(--r-md);
+    border: 1px solid transparent;
+    padding: 8px 16px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    cursor: pointer;
+    transition: var(--t);
+    box-shadow: none;
+  }
+  .btn-primary:hover {
+    background-color: #ECECEC;
+  }
+  .btn-primary:disabled {
+    opacity: 0.4;
+    cursor: not-allowed;
+  }
+
+  .btn-secondary {
+    background-color: transparent;
+    color: var(--text-primary);
+    font-weight: 500;
+    font-size: 13px;
+    border-radius: var(--r-md);
+    border: 1px solid var(--border);
+    padding: 8px 16px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    cursor: pointer;
+    transition: var(--t);
+    box-shadow: none;
+  }
+  .btn-secondary:hover {
+    background-color: rgba(255, 255, 255, 0.04);
+    border-color: var(--border-hover);
+    color: #FFFFFF;
+  }
+  .btn-secondary:disabled {
+    opacity: 0.4;
+    cursor: not-allowed;
+  }
+
+  .btn-icon {
+    width: 34px;
+    height: 34px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: var(--r-sm);
+    border: 1px solid var(--border);
+    background: transparent;
+    color: var(--text-sec);
+    cursor: pointer;
+    transition: var(--t);
+    box-shadow: none;
+  }
+  .btn-icon:hover {
+    color: #FFFFFF;
+    border-color: var(--border-hover);
+    background: rgba(255, 255, 255, 0.04);
+  }
+
+  /* Form Inputs */
+  .input-dark {
+    background-color: var(--bg-surface-3);
+    border: 1px solid var(--border);
+    border-radius: var(--r-sm);
+    color: var(--text-primary);
+    font-size: 13px;
+    padding: 8px 12px;
+    transition: var(--t);
+    outline: none;
+  }
+  .input-dark:focus {
+    border-color: #FFFFFF;
+    box-shadow: none;
+  }
+  .input-dark::placeholder {
+    color: var(--text-sec);
+  }
+
+  /* Badges */
+  .badge-pill {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 3px 8px;
+    border-radius: 4px;
+    font-size: 11px;
+    font-family: var(--font-mono);
+    background: rgba(255, 255, 255, 0.06);
+    color: var(--text-sec);
+    border: 1px solid rgba(255, 255, 255, 0.06);
+  }
+
+  .badge-active {
+    background: rgba(255, 255, 255, 0.12);
+    color: #FFFFFF;
+    border-color: rgba(255, 255, 255, 0.12);
+  }
+
+  /* Flat Progress Bar */
+  .progress-track {
+    width: 100%;
+    height: 4px;
+    background-color: rgba(255, 255, 255, 0.08);
+    border-radius: 2px;
+    overflow: hidden;
+  }
+  .progress-fill {
+    height: 100%;
+    background-color: #FFFFFF;
+    border-radius: 2px;
+    transition: width 0.2s ease;
+    box-shadow: none;
+  }
+}

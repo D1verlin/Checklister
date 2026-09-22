@@ -1,0 +1,72 @@
+{
+  "name": "checklister",
+  "version": "1.0.0",
+  "description": "Minimalist Offline Anime Tracker & Local Media Library",
+  "author": "D1verlin",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/D1verlin/Checklister.git"
+  },
+  "private": true,
+  "type": "module",
+  "main": "dist-electron/main.js",
+  "scripts": {
+    "dev": "vite",
+    "dev:electron": "vite --mode electron",
+    "build": "tsc && vite build --mode electron",
+    "build:icons": "electron scripts/build_icons.cjs",
+    "dist": "npm run build && electron-builder --win",
+    "test": "node --experimental-strip-types tests/parser.test.js",
+    "preview": "vite preview"
+  },
+  "build": {
+    "appId": "com.checklister.app",
+    "productName": "CheckLister",
+    "directories": {
+      "output": "release"
+    },
+    "files": [
+      "dist/**/*",
+      "dist-electron/**/*",
+      "public/**/*",
+      "package.json"
+    ],
+    "win": {
+      "target": [
+        "nsis",
+        "portable"
+      ],
+      "icon": "public/icon.ico"
+    },
+    "nsis": {
+      "oneClick": false,
+      "allowToChangeInstallationDirectory": true,
+      "createDesktopShortcut": true,
+      "createStartMenuShortcut": true,
+      "shortcutName": "CheckLister"
+    }
+  },
+  "dependencies": {
+    "clsx": "^2.1.1",
+    "lucide-react": "^1.16.0",
+    "react": "^18.3.1",
+    "react-dom": "^18.3.1",
+    "tailwind-merge": "^3.0.2"
+  },
+  "devDependencies": {
+    "@types/node": "^22.10.2",
+    "@types/react": "^18.3.12",
+    "@types/react-dom": "^18.3.1",
+    "@vitejs/plugin-react": "^4.3.4",
+    "autoprefixer": "^10.4.20",
+    "electron": "^34.2.0",
+    "electron-builder": "^25.1.8",
+    "postcss": "^8.4.49",
+    "tailwindcss": "^3.4.17",
+    "typescript": "^5.7.2",
+    "vite": "^6.0.7",
+    "vite-plugin-electron": "^0.29.0",
+    "vite-plugin-electron-renderer": "^0.14.6"
+  }
+}
