@@ -103,7 +103,7 @@ export async function fetchAniList(query: string): Promise<AniListMedia | null> 
 }
 
 const SHIKIMORI_HEADERS = {
-  'User-Agent': 'CheckLister/1.0.0 (https://github.com/D1verlin/Checklister)',
+  'User-Agent': 'CheckLister/1.0.1 (https://github.com/D1verlin/Checklister)',
   'Accept': 'application/json',
 };
 
