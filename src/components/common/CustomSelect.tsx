@@ -1,13 +1,13 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { ChevronDown, Check } from 'lucide-react';
 
-export interface SelectOption<T extends string = string> {
+export interface SelectOption<T extends string | number = string> {
   value: T;
   label: string;
   description?: string;
 }
 
-interface CustomSelectProps<T extends string = string> {
+interface CustomSelectProps<T extends string | number = string> {
   value: T;
   onChange: (value: T) => void;
   options: SelectOption<T>[];
@@ -15,7 +15,7 @@ interface CustomSelectProps<T extends string = string> {
   disabled?: boolean;
 }
 
-export function CustomSelect<T extends string = string>({
+export function CustomSelect<T extends string | number = string>({
   value,
   onChange,
   options,

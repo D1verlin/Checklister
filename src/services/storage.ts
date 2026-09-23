@@ -7,8 +7,11 @@ const EPISODES_KEY = 'anime_tracker_episodes';
 export const defaultSettings: AppSettings = {
   scannedFolders: [],
   customFolders: ['Шедевры', 'Посмотреть позже'],
-  playerType: 'system',
+  playerType: 'mpv',
+  mpvPath: '',
   customPlayerPath: '',
+  autoNextEpisode: true,
+  watchedThresholdPercent: 85,
   preferRussianTitles: true,
   autoScanOnStartup: true,
   discordRpcEnabled: true,

@@ -11,11 +11,14 @@ import {
   setDiscordRpcEnabled,
   destroyDiscordRpc,
 } from './discord.ts';
+import { MpvManager } from './mpvManager.ts';
+import { detectMpvExecutable, validateMpvPath } from './mpvDetector.ts';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
 let mainWindow: BrowserWindow | null = null;
+const mpvManager = new MpvManager(() => mainWindow);
 
 interface ActivePlaybackSession {
   filePath: string;
@@ -275,42 +278,165 @@ ipcMain.handle('fs:scanDirectories', async (_event, folderPaths: string[]) => {
   return allFiles;
 });
 
+ipcMain.handle('player:detectMpv', async () => {
+  return await detectMpvExecutable();
+});
+
+ipcMain.handle('player:validateMpv', async (_event, targetPath: string) => {
+  return await validateMpvPath(targetPath);
+});
+
+ipcMain.handle('dialog:openMpvFileDialog', async () => {
+  try {
+    const win = BrowserWindow.getFocusedWindow() || mainWindow;
+    const opts = {
+      title: 'Выберите исполняемый файл mpv (mpv.exe)',
+      filters: [
+        { name: 'Исполняемый файл mpv (*.exe, *.com)', extensions: ['exe', 'com'] },
+        { name: 'Все файлы (*.*)', extensions: ['*'] },
+      ],
+      properties: ['openFile' as const],
+    };
+    const res = win
+      ? await dialog.showOpenDialog(win, opts)
+      : await dialog.showOpenDialog(opts);
+    return res.canceled || res.filePaths.length === 0 ? null : res.filePaths[0];
+  } catch (err) {
+    console.error('[Electron] dialog:openMpvFileDialog error:', err);
+    return null;
+  }
+});
+
+ipcMain.handle('player:stop', async () => {
+  await mpvManager.stopPlayback();
+  return { success: true };
+});
+
 ipcMain.handle(
   'player:openFile',
   async (
     _event,
-    {
-      filePath,
-      playerType,
-      customPath,
-      animeId,
-      episodeId,
-      animeTitle,
-      episodeNumber,
-      totalEpisodes,
-    }: {
+    payload: {
       filePath: string;
-      playerType?: string;
+      playerType?: 'mpv' | 'system' | 'custom';
+      mpvPath?: string;
       customPath?: string;
+      playlist?: { id: string; filePath: string; episodeNumber?: number; title?: string }[];
       animeId?: string;
       episodeId?: string;
       animeTitle?: string;
       episodeNumber?: number;
       totalEpisodes?: number;
+      thresholdPercent?: number;
+      autoNext?: boolean;
     }
   ) => {
+    const {
+      filePath,
+      playerType = 'mpv',
+      mpvPath,
+      customPath,
+      playlist,
+      animeId,
+      episodeId,
+      animeTitle,
+      episodeNumber,
+      totalEpisodes,
+      thresholdPercent,
+      autoNext,
+    } = payload;
+
     if (!filePath) {
       return { success: false, error: 'Empty file path' };
     }
 
-    const exists = fs.existsSync(filePath);
-    if (!exists) {
+    if (!fs.existsSync(filePath)) {
       return {
         success: false,
         error: `Файл не найден на диске: ${filePath}`,
       };
     }
 
+    // 1. MPV with JSON-IPC & playlist support
+    if (playerType === 'mpv') {
+      let targetMpvPath = mpvPath || customPath;
+      if (!targetMpvPath || !fs.existsSync(targetMpvPath)) {
+        const detected = await detectMpvExecutable();
+        if (detected?.path) {
+          targetMpvPath = detected.path;
+        }
+      }
+
+      if (!targetMpvPath || !fs.existsSync(targetMpvPath)) {
+        return {
+          success: false,
+          error: 'Исполняемый файл mpv.exe не найден. Перейдите в Настройки и нажмите «Найти автоматически» или укажите путь через «Обзор».',
+        };
+      }
+
+      const initialEpisode = {
+        id: episodeId || path.basename(filePath),
+        filePath,
+        episodeNumber,
+        title: animeTitle,
+      };
+
+      return await mpvManager.startPlayback({
+        mpvPath: targetMpvPath,
+        initialEpisode,
+        playlist,
+        animeId,
+        animeTitle,
+        totalEpisodes,
+        thresholdPercent: thresholdPercent ?? 85,
+        autoNext: autoNext ?? true,
+      });
+    }
+
+    // 2. Custom Player Fallback
+    if (playerType === 'custom' && customPath && fs.existsSync(customPath)) {
+      currentPlayback = {
+        filePath,
+        animeId,
+        episodeId,
+        startTime: Date.now(),
+      };
+
+      if (animeTitle) {
+        const stateStr = totalEpisodes
+          ? `Серия ${episodeNumber || 1} из ${totalEpisodes}`
+          : `Серия ${episodeNumber || 1}`;
+        setDiscordActivity({
+          details: animeTitle,
+          state: stateStr,
+          startTimestamp: Date.now(),
+        });
+      }
+
+      const proc = spawn(customPath, [filePath], {
+        detached: false,
+        stdio: 'ignore',
+      });
+
+      proc.on('close', () => {
+        if (currentPlayback && currentPlayback.filePath === filePath) {
+          const elapsedMs = Date.now() - currentPlayback.startTime;
+          if (elapsedMs >= 180000 && currentPlayback.animeId) {
+            mainWindow?.webContents.send('player:episodeWatched', {
+              animeId: currentPlayback.animeId,
+              episodeId: currentPlayback.episodeId,
+              filePath: currentPlayback.filePath,
+            });
+          }
+          currentPlayback = null;
+        }
+        clearDiscordActivity();
+      });
+
+      return { success: true };
+    }
+
+    // 3. System Default Player via Windows Association
     currentPlayback = {
       filePath,
       animeId,
@@ -329,39 +455,11 @@ ipcMain.handle(
       });
     }
 
-    try {
-      if (playerType === 'custom' && customPath && fs.existsSync(customPath)) {
-        const proc = spawn(customPath, [filePath], {
-          detached: false,
-          stdio: 'ignore',
-        });
-
-        proc.on('close', () => {
-          if (currentPlayback && currentPlayback.filePath === filePath) {
-            const elapsedMs = Date.now() - currentPlayback.startTime;
-            if (elapsedMs >= 180000 && currentPlayback.animeId) {
-              mainWindow?.webContents.send('player:episodeWatched', {
-                animeId: currentPlayback.animeId,
-                episodeId: currentPlayback.episodeId,
-                filePath: currentPlayback.filePath,
-              });
-            }
-            currentPlayback = null;
-          }
-          clearDiscordActivity();
-        });
-
-        return { success: true };
-      } else {
-        const err = await shell.openPath(filePath);
-        if (err) {
-          return { success: false, error: err };
-        }
-        return { success: true };
-      }
-    } catch (err) {
-      return { success: false, error: (err as Error).message };
+    const err = await shell.openPath(filePath);
+    if (err) {
+      return { success: false, error: err };
     }
+    return { success: true };
   }
 );
 
@@ -675,6 +773,7 @@ app.whenReady().then(() => {
 });
 
 app.on('window-all-closed', () => {
+  mpvManager.stopPlayback();
   destroyDiscordRpc();
   if (process.platform !== 'darwin') {
     app.quit();

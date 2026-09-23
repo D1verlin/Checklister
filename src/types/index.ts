@@ -9,6 +9,12 @@ export interface Episode {
   isWatched: boolean;
   watchedAt?: string; // ISO date
   fileMissing?: boolean;
+  playbackProgress?: {
+    timePos: number;
+    duration: number;
+    percent: number;
+    lastUpdated?: string;
+  };
 }
 
 export interface AnimeMetadata {
@@ -60,8 +66,11 @@ export type SortOption = 'title' | 'score' | 'date' | 'size' | 'remaining';
 export interface AppSettings {
   scannedFolders: string[];
   customFolders: string[]; // User created collections/folders
-  playerType: 'system' | 'custom';
+  playerType: 'mpv' | 'system' | 'custom';
+  mpvPath: string; // e.g. "C:\mpv\mpv.exe"
   customPlayerPath: string; // e.g. "C:\Program Files\mpv\mpv.exe"
+  autoNextEpisode: boolean; // default true for binge-watching
+  watchedThresholdPercent: number; // default 85 (%)
   preferRussianTitles: boolean;
   autoScanOnStartup: boolean;
   discordRpcEnabled: boolean;

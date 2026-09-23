@@ -16,6 +16,9 @@ import {
   Sparkles,
   Database,
   FolderPlus,
+  Search,
+  FolderOpen,
+  AlertCircle,
 } from 'lucide-react';
 import type { AppSettings, UILanguage } from '../types/index.ts';
 import { useI18n } from '../i18n/translations.ts';
@@ -28,6 +31,11 @@ import {
   GITHUB_REPO_URL,
   type UpdateInfo,
 } from '../services/updater.ts';
+import {
+  detectMpvExecutable,
+  validateMpvPath,
+  browseMpvExecutable,
+} from '../services/player.ts';
 import CheckListerLogo from '../assets/CheckLister.svg';
 
 interface SettingsViewProps {
@@ -60,9 +68,83 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
   const [isCheckingUpdates, setIsCheckingUpdates] = useState(false);
   const [updateInfo, setUpdateInfo] = useState<UpdateInfo | null>(null);
   const [hasCheckedUpdates, setHasCheckedUpdates] = useState(false);
+  const [isDetectingMpv, setIsDetectingMpv] = useState(false);
+  const [mpvValidation, setMpvValidation] = useState<{
+    checked: boolean;
+    valid: boolean;
+    version?: string;
+    error?: string;
+  }>({ checked: false, valid: false });
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const { t } = useI18n(form.uiLanguage);
+
+  useEffect(() => {
+    let isMounted = true;
+    if (form.playerType === 'mpv') {
+      if (form.mpvPath) {
+        validateMpvPath(form.mpvPath).then((res) => {
+          if (isMounted) {
+            setMpvValidation({ checked: true, valid: res.valid, version: res.version, error: res.error });
+          }
+        });
+      } else {
+        // Automatically check if MPV is already installed on the machine
+        detectMpvExecutable().then((detected) => {
+          if (isMounted) {
+            if (detected?.path) {
+              const updated = { ...form, mpvPath: detected.path };
+              setForm(updated);
+              onSave(updated);
+              setMpvValidation({ checked: true, valid: true, version: detected.version });
+            } else {
+              setMpvValidation({ checked: true, valid: false });
+            }
+          }
+        });
+      }
+    }
+    return () => {
+      isMounted = false;
+    };
+  }, [form.playerType, form.mpvPath]);
+
+  const handleAutoDetectMpv = async () => {
+    setIsDetectingMpv(true);
+    try {
+      const detected = await detectMpvExecutable();
+      if (detected?.path) {
+        const updated = { ...form, mpvPath: detected.path };
+        setForm(updated);
+        onSave(updated);
+        setMpvValidation({ checked: true, valid: true, version: detected.version });
+        triggerToast(`${t('mpvFoundToast')}: ${detected.version || detected.path}`);
+      } else {
+        setMpvValidation({ checked: true, valid: false });
+        triggerToast(t('mpvNotFoundToast'));
+      }
+    } catch {
+      triggerToast(t('mpvNotFoundToast'));
+    } finally {
+      setIsDetectingMpv(false);
+    }
+  };
+
+  const handleBrowseMpv = async () => {
+    try {
+      const chosen = await browseMpvExecutable();
+      if (chosen) {
+        const updated = { ...form, mpvPath: chosen };
+        setForm(updated);
+        onSave(updated);
+        const res = await validateMpvPath(chosen);
+        setMpvValidation({ checked: true, valid: res.valid, version: res.version, error: res.error });
+        if (res.valid) {
+          triggerToast(t('mpvFoundToast'));
+        }
+      }
+    } catch {}
+  };
 
   const handleAddUserFolder = (e: React.FormEvent) => {
     e.preventDefault();
@@ -109,7 +191,12 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
     { value: 'en', label: 'English (US)', description: 'English interface' },
   ];
 
-  const playerOptions: SelectOption<'system' | 'custom'>[] = [
+  const playerOptions: SelectOption<'mpv' | 'system' | 'custom'>[] = [
+    {
+      value: 'mpv',
+      label: t('playerMpv'),
+      description: t('playerMpvDesc'),
+    },
     {
       value: 'system',
       label: t('playerSystemDefault'),
@@ -120,6 +207,13 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
       label: t('playerCustom'),
       description: t('playerCustomDesc'),
     },
+  ];
+
+  const thresholdOptions: SelectOption<number>[] = [
+    { value: 80, label: '80%', description: '80% хронометража' },
+    { value: 85, label: '85% (Рекомендуется)', description: 'Оптимально для большинства аниме' },
+    { value: 90, label: '90%', description: '90% хронометража' },
+    { value: 95, label: '95%', description: 'Практически до титров' },
   ];
 
   const applyFolderAddition = (newFolders: string[]) => {
@@ -373,14 +467,139 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
             </div>
           </div>
 
-          <div className="space-y-3 w-full">
-            <CustomSelect<'system' | 'custom'>
+          <div className="space-y-4 w-full">
+            <CustomSelect<'mpv' | 'system' | 'custom'>
               value={form.playerType}
-              onChange={(val) => setForm({ ...form, playerType: val })}
+              onChange={(val) => {
+                const updated = { ...form, playerType: val };
+                setForm(updated);
+                onSave(updated);
+              }}
               options={playerOptions}
               className="w-full"
             />
 
+            {/* MPV Configuration */}
+            {form.playerType === 'mpv' && (
+              <div className="space-y-4 pt-1 w-full">
+                <div className="space-y-1.5 w-full">
+                  <div className="flex items-center justify-between text-xs">
+                    <label className="text-[#888888]">
+                      {t('mpvPathLabel')}
+                    </label>
+                    {mpvValidation.checked && (
+                      mpvValidation.valid ? (
+                        <span className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded text-[11px] font-mono bg-emerald-950/40 text-emerald-300 border border-emerald-500/20">
+                          <Check size={11} />
+                          <span>{t('mpvStatusReady')}{mpvValidation.version ? ` (${mpvValidation.version})` : ''}</span>
+                        </span>
+                      ) : (
+                        <span className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded text-[11px] font-mono bg-red-950/40 text-red-300 border border-red-500/20">
+                          <AlertCircle size={11} />
+                          <span>{t('mpvStatusNotFound')}</span>
+                        </span>
+                      )
+                    )}
+                  </div>
+
+                  <div className="flex items-center gap-2 w-full">
+                    <input
+                      type="text"
+                      value={form.mpvPath || ''}
+                      onChange={(e) => {
+                        const val = e.target.value;
+                        const updated = { ...form, mpvPath: val };
+                        setForm(updated);
+                        onSave(updated);
+                      }}
+                      placeholder={t('mpvPathPlaceholder')}
+                      className="input-dark flex-1 text-xs font-mono py-2 bg-[#161616] border-white/10"
+                    />
+
+                    <button
+                      type="button"
+                      onClick={handleAutoDetectMpv}
+                      disabled={isDetectingMpv}
+                      className="btn-secondary py-2 px-3 text-xs shrink-0 gap-1.5 border-white/10 hover:border-white/20"
+                      title={t('btnDetectMpv')}
+                    >
+                      <Search size={13} className={isDetectingMpv ? 'animate-spin' : ''} />
+                      <span>{isDetectingMpv ? t('btnDetectingMpv') : t('btnDetectMpv')}</span>
+                    </button>
+
+                    <button
+                      type="button"
+                      onClick={handleBrowseMpv}
+                      className="btn-secondary py-2 px-3 text-xs shrink-0 gap-1.5 border-white/10 hover:border-white/20"
+                      title={t('btnBrowseMpv')}
+                    >
+                      <FolderOpen size={13} />
+                      <span>{t('btnBrowseMpv')}</span>
+                    </button>
+                  </div>
+
+                  {mpvValidation.checked && !mpvValidation.valid && (
+                    <div className="text-[11px] text-[#888888] flex items-center gap-1.5 pt-1">
+                      <span>{t('mpvDownloadHint')}</span>
+                      <button
+                        type="button"
+                        onClick={() => openExternalUrl('https://mpv.io/installation/')}
+                        className="text-white hover:underline inline-flex items-center gap-1 shrink-0 font-medium"
+                      >
+                        <span>mpv.io</span>
+                        <ExternalLink size={10} />
+                      </button>
+                    </div>
+                  )}
+                </div>
+
+                {/* Sub-options for MPV: Binge-watching & Threshold */}
+                <div className="pt-2 space-y-3.5 border-t border-white/5">
+                  <div className="flex items-center justify-between gap-4 py-1">
+                    <div>
+                      <div className="text-xs font-medium text-white">
+                        {t('settingAutoNext')}
+                      </div>
+                      <div className="text-[11px] text-[#888888]">
+                        {t('settingAutoNextDesc')}
+                      </div>
+                    </div>
+                    <CustomCheckbox
+                      checked={form.autoNextEpisode ?? true}
+                      onChange={(checked) => {
+                        const updated = { ...form, autoNextEpisode: checked };
+                        setForm(updated);
+                        onSave(updated);
+                      }}
+                    />
+                  </div>
+
+                  <div className="flex items-center justify-between gap-4 py-1">
+                    <div>
+                      <div className="text-xs font-medium text-white">
+                        {t('settingThreshold')}
+                      </div>
+                      <div className="text-[11px] text-[#888888]">
+                        {t('settingThresholdDesc')}
+                      </div>
+                    </div>
+                    <div className="w-56 shrink-0">
+                      <CustomSelect<number>
+                        value={form.watchedThresholdPercent ?? 85}
+                        onChange={(val) => {
+                          const updated = { ...form, watchedThresholdPercent: val };
+                          setForm(updated);
+                          onSave(updated);
+                        }}
+                        options={thresholdOptions}
+                      />
+                    </div>
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {/* Custom Other Player */}
             {form.playerType === 'custom' && (
               <div className="space-y-1.5 pt-1 w-full">
                 <label className="text-xs text-[#888888]">
@@ -389,7 +608,11 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
                 <input
                   type="text"
                   value={form.customPlayerPath}
-                  onChange={(e) => setForm({ ...form, customPlayerPath: e.target.value })}
+                  onChange={(e) => {
+                    const updated = { ...form, customPlayerPath: e.target.value };
+                    setForm(updated);
+                    onSave(updated);
+                  }}
                   placeholder={t('customPlayerPlaceholder')}
                   className="input-dark w-full text-xs font-mono py-2 bg-[#161616] border-white/10"
                 />

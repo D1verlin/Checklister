@@ -42,6 +42,13 @@ function formatCountdown(seconds?: number): string {
   return `in ${hours}h`;
 }
 
+function formatSeconds(sec?: number): string {
+  if (!sec || sec <= 0) return '00:00';
+  const m = Math.floor(sec / 60);
+  const s = Math.floor(sec % 60);
+  return `${String(m).padStart(2, '0')}:${String(s).padStart(2, '0')}`;
+}
+
 const pendingDetailCoverDownloads = new Set<string>();
 
 export const AnimeDetailView: React.FC<AnimeDetailViewProps> = ({
@@ -129,7 +136,10 @@ export const AnimeDetailView: React.FC<AnimeDetailViewProps> = ({
     ? anime.titleRomaji
     : anime.titleRussian || anime.titleEnglish;
 
-  const nextEp = anime.nextEpisodeToWatch;
+  const inProgressEp = anime.episodes.find(
+    (e) => !e.isWatched && e.playbackProgress && e.playbackProgress.timePos > 0
+  );
+  const nextEp = inProgressEp || anime.nextEpisodeToWatch || anime.episodes.find((e) => !e.isWatched);
   const totalEpCount = Math.max(anime.totalEpisodes || 0, anime.totalLocalEpisodes);
   const hasMissingGaps = anime.missingEpisodeNumbers && anime.missingEpisodeNumbers.length > 0;
 
@@ -191,14 +201,60 @@ export const AnimeDetailView: React.FC<AnimeDetailViewProps> = ({
               )}
             </div>
 
-            {/* Quick Play Button */}
+            {/* Quick Play Button with Integrated Progress Bar */}
             {nextEp ? (
               <button
                 onClick={() => onContinueWatching(anime)}
-                className="btn-primary w-full py-2.5 text-xs font-semibold shadow-none"
+                className="relative overflow-hidden btn-primary w-full py-2.5 text-xs font-semibold shadow-none flex items-center justify-center gap-1.5"
               >
-                <Play size={13} fill="currentColor" />
-                <span>{t('btnContinue')}: EP {String(nextEp.episodeNumber).padStart(2, '0')}</span>
+                {/* Progress bar background fill inside button */}
+                {nextEp.playbackProgress && nextEp.playbackProgress.timePos > 0 && (
+                  <>
+                    <div
+                      className="absolute inset-y-0 left-0 bg-black/[0.12] transition-all duration-300 pointer-events-none"
+                      style={{
+                        width: `${Math.min(
+                          100,
+                          nextEp.playbackProgress.percent ||
+                            (nextEp.playbackProgress.duration
+                              ? Math.round(
+                                  (nextEp.playbackProgress.timePos / nextEp.playbackProgress.duration) * 100
+                                )
+                              : 0)
+                        )}%`,
+                      }}
+                    />
+                    <div className="absolute bottom-0 left-0 right-0 h-[2.5px] bg-black/15 pointer-events-none">
+                      <div
+                        className="h-full bg-black/60 transition-all duration-300"
+                        style={{
+                          width: `${Math.min(
+                            100,
+                            nextEp.playbackProgress.percent ||
+                              (nextEp.playbackProgress.duration
+                                ? Math.round(
+                                    (nextEp.playbackProgress.timePos / nextEp.playbackProgress.duration) * 100
+                                  )
+                                : 0)
+                          )}%`,
+                        }}
+                      />
+                    </div>
+                  </>
+                )}
+
+                <Play size={13} fill="currentColor" className="shrink-0 relative z-10" />
+                <span className="truncate relative z-10 flex items-center gap-1.5">
+                  <span className="font-mono font-semibold">EP {String(nextEp.episodeNumber).padStart(2, '0')}</span>
+                  {nextEp.playbackProgress && nextEp.playbackProgress.timePos > 0 && (
+                    <span className="font-mono opacity-80">
+                      • {formatSeconds(nextEp.playbackProgress.timePos)}
+                      {nextEp.playbackProgress.duration > 0
+                        ? ` / ${formatSeconds(nextEp.playbackProgress.duration)}`
+                        : ''}
+                    </span>
+                  )}
+                </span>
               </button>
             ) : (
               <div className="w-full py-2 px-3 rounded-[8px] bg-white/5 border border-white/5 text-xs text-[#888888] flex items-center justify-center gap-2 font-mono">
@@ -396,7 +452,7 @@ export const AnimeDetailView: React.FC<AnimeDetailViewProps> = ({
                           </div>
                         )}
 
-                        <div className="p-3 px-4 flex items-center justify-between gap-4 hover:bg-white/[0.03] transition-colors">
+                        <div className="relative p-3 px-4 flex items-center justify-between gap-4 hover:bg-white/[0.03] transition-colors">
                           {/* Checkbox & Name */}
                           <div className="flex items-center gap-3.5 min-w-0 flex-1">
                             <CustomCheckbox
@@ -416,6 +472,13 @@ export const AnimeDetailView: React.FC<AnimeDetailViewProps> = ({
                             >
                               {ep.fileName}
                             </span>
+
+                            {/* Subtle progress indicator when partially watched */}
+                            {!ep.isWatched && ep.playbackProgress && ep.playbackProgress.percent > 0 && (
+                              <span className="font-mono text-[10px] text-[#888888] bg-white/[0.04] border border-white/10 rounded px-1.5 py-0.5 shrink-0">
+                                {formatSeconds(ep.playbackProgress.timePos)} / {formatSeconds(ep.playbackProgress.duration)}
+                              </span>
+                            )}
                           </div>
 
                           {/* Right Meta & Actions */}
@@ -441,6 +504,16 @@ export const AnimeDetailView: React.FC<AnimeDetailViewProps> = ({
                               <Folder size={12} />
                             </button>
                           </div>
+
+                          {/* Subtle progress bar at bottom of row */}
+                          {!ep.isWatched && ep.playbackProgress && ep.playbackProgress.percent > 0 && (
+                            <div className="absolute bottom-0 left-0 right-0 h-[2px] bg-white/5 pointer-events-none">
+                              <div
+                                className="h-full bg-white/30"
+                                style={{ width: `${Math.min(100, ep.playbackProgress.percent)}%` }}
+                              />
+                            </div>
+                          )}
                         </div>
                       </React.Fragment>
                     );

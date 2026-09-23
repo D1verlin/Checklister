@@ -36,7 +36,25 @@ contextBridge.exposeInMainWorld('electronAPI', {
     },
   },
   toggleDevTools: () => ipcRenderer.invoke('devtools:toggle'),
-  setDevTools: (open) => ipcRenderer.invoke('devtools:setOpen', open),
+  detectMpv: () => ipcRenderer.invoke('player:detectMpv'),
+  validateMpv: (targetPath) => ipcRenderer.invoke('player:validateMpv', targetPath),
+  browseMpvExecutable: () => ipcRenderer.invoke('dialog:openMpvFileDialog'),
+  stopPlayback: () => ipcRenderer.invoke('player:stop'),
+  onPlaybackProgress: (callback) => {
+    const listener = (_event, data) => callback(data);
+    ipcRenderer.on('player:playbackProgress', listener);
+    return () => ipcRenderer.removeListener('player:playbackProgress', listener);
+  },
+  onEpisodeChanged: (callback) => {
+    const listener = (_event, data) => callback(data);
+    ipcRenderer.on('player:episodeChanged', listener);
+    return () => ipcRenderer.removeListener('player:episodeChanged', listener);
+  },
+  onPlaybackClosed: (callback) => {
+    const listener = () => callback();
+    ipcRenderer.on('player:playbackClosed', listener);
+    return () => ipcRenderer.removeListener('player:playbackClosed', listener);
+  },
   cacheCover: (animeId, urls) =>
     ipcRenderer.invoke('cache:saveCover', {
       animeId,

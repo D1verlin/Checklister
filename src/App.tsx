@@ -230,8 +230,66 @@ export const App: React.FC = () => {
       });
     });
 
+    const progressCleanup = electron.onPlaybackProgress?.((data: any) => {
+      if (!data?.episodeId || !data?.filePath) return;
+
+      setAnimeList((prevList) => {
+        let changed = false;
+        const nextList = prevList.map((anime) => {
+          if (data.animeId && anime.id !== data.animeId) return anime;
+
+          const updatedEpisodes = anime.episodes.map((ep) => {
+            if (ep.id === data.episodeId || ep.filePath.toLowerCase() === data.filePath.toLowerCase()) {
+              changed = true;
+              return {
+                ...ep,
+                playbackProgress: {
+                  timePos: data.timePos,
+                  duration: data.duration,
+                  percent: data.percent,
+                  lastUpdated: new Date().toISOString(),
+                },
+              };
+            }
+            return ep;
+          });
+
+          if (!changed) return anime;
+          const nextEpisodeToWatch = updatedEpisodes.find((e) => !e.isWatched);
+          const updatedAnime = { ...anime, episodes: updatedEpisodes, nextEpisodeToWatch };
+          if (selectedAnime?.id === anime.id) {
+            setSelectedAnime(updatedAnime);
+          }
+          return updatedAnime;
+        });
+
+        return changed ? nextList : prevList;
+      });
+    });
+
+    const changedCleanup = electron.onEpisodeChanged?.((data: any) => {
+      if (!data?.episodeNumber) return;
+      showToast(
+        settings.uiLanguage === 'ru'
+          ? `Воспроизведение: Серия ${data.episodeNumber}`
+          : `Now playing: Episode ${data.episodeNumber}`,
+        'info'
+      );
+    });
+
+    const closedCleanup = electron.onPlaybackClosed?.(() => {
+      setAnimeList((currentList) => {
+        const rawEpisodes: Episode[] = currentList.flatMap((a) => a.episodes);
+        saveLibrary(currentList, rawEpisodes);
+        return currentList;
+      });
+    });
+
     return () => {
       if (typeof cleanup === 'function') cleanup();
+      if (typeof progressCleanup === 'function') progressCleanup();
+      if (typeof changedCleanup === 'function') changedCleanup();
+      if (typeof closedCleanup === 'function') closedCleanup();
     };
   }, [settings.autoTrackPlayback, settings.preferRussianTitles, settings.uiLanguage, selectedAnime?.id]);
 
@@ -324,22 +382,36 @@ export const App: React.FC = () => {
   };
 
   const handlePlayEpisode = async (episode: Episode) => {
-    // Discord RPC presence
-    if (settings.discordRpcEnabled) {
-      const anime = animeList.find((a) => a.id === episode.animeId);
-      if (anime) {
-        const title = (settings.preferRussianTitles && anime.titleRussian) ? anime.titleRussian : anime.titleRomaji;
-        (window as any).electronAPI?.setDiscordActivity?.({
-          details: title,
-          state: `Серия ${episode.episodeNumber || '?'}`,
-          startTimestamp: Date.now(),
-          largeImageKey: 'monolith_logo',
-          largeImageText: title,
-        });
+    const anime = animeList.find((a) => a.id === episode.animeId);
+    const title = anime
+      ? (settings.preferRussianTitles && anime.titleRussian) ? anime.titleRussian : anime.titleRomaji
+      : undefined;
+
+    // Build playlist of subsequent episodes for binge-watching in mpv
+    let playlist: { id: string; filePath: string; episodeNumber?: number; title?: string }[] = [];
+    if (anime && anime.episodes) {
+      const sorted = [...anime.episodes].sort((a, b) => a.episodeNumber - b.episodeNumber);
+      const currentIdx = sorted.findIndex((e) => e.id === episode.id);
+      if (currentIdx !== -1) {
+        playlist = sorted.slice(currentIdx + 1).map((e) => ({
+          id: e.id,
+          filePath: e.filePath,
+          episodeNumber: e.episodeNumber,
+          title,
+        }));
       }
     }
 
-    const res = await openVideoFile(episode.filePath);
+    const res = await openVideoFile({
+      filePath: episode.filePath,
+      animeId: episode.animeId,
+      episodeId: episode.id,
+      animeTitle: title,
+      episodeNumber: episode.episodeNumber,
+      totalEpisodes: anime?.totalEpisodes || anime?.episodes.length,
+      playlist,
+    });
+
     if (!res.success && res.error) {
       showToast(res.error, 'error');
     }
@@ -347,7 +419,11 @@ export const App: React.FC = () => {
 
   const handleContinueWatching = async (anime: AnimeWithEpisodes, e?: React.MouseEvent) => {
     if (e) e.stopPropagation();
-    const target = anime.nextEpisodeToWatch || anime.episodes[0];
+    const inProgress = anime.episodes.find(
+      (ep) => !ep.isWatched && ep.playbackProgress && ep.playbackProgress.timePos > 0
+    );
+    const target =
+      inProgress || anime.nextEpisodeToWatch || anime.episodes.find((ep) => !ep.isWatched) || anime.episodes[0];
     if (target) {
       await handlePlayEpisode(target);
     }

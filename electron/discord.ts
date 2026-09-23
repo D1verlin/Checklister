@@ -12,6 +12,7 @@ export interface DiscordActivityOptions {
   details: string;
   state?: string;
   startTimestamp?: number;
+  endTimestamp?: number;
   largeImageKey?: string;
   largeImageText?: string;
   smallImageKey?: string;
@@ -70,6 +71,7 @@ export async function setDiscordActivity(options: DiscordActivityOptions) {
       details: options.details,
       state: options.state,
       startTimestamp: options.startTimestamp ? new Date(options.startTimestamp) : undefined,
+      endTimestamp: options.endTimestamp ? new Date(options.endTimestamp) : undefined,
       largeImageKey: options.largeImageKey || 'checklister_icon',
       largeImageText: options.largeImageText || 'CheckLister',
       smallImageKey: options.smallImageKey,

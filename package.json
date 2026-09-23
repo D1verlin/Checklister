@@ -1,6 +1,6 @@
 {
   "name": "checklister",
-  "version": "1.0.2",
+  "version": "1.0.3",
   "description": "Minimalist Offline Anime Tracker & Local Media Library",
   "author": "D1verlin",
   "license": "MIT",
@@ -17,7 +17,7 @@
     "build": "tsc && vite build --mode electron",
     "build:icons": "electron scripts/build_icons.cjs",
     "dist": "npm run build && electron-builder --win",
-    "test": "tsx tests/parser.test.js",
+    "test": "tsx tests/parser.test.js && tsx tests/mpv.test.js",
     "preview": "vite preview"
   },
   "build": {
